@@ -1,0 +1,105 @@
+@page "/question-detail"
+@using QuestionEntity = EduNexus.Api.Question.Entities.Question
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Question Detail</PageTitle>
+
+<div class="page-header">
+    <h2>Question Detail <span class="screen-tag">Question · FT-03</span></h2>
+    <p class="text-muted">Thêm/sửa câu hỏi: nội dung, 2–6 đáp án, đúng 1 đáp án, giải thích, độ khó.</p>
+</div>
+
+<div class="card" style="max-width:760px">
+    <div class="card-body">
+        <div class="mb-2">
+            <label class="form-label">Module</label>
+            <select class="form-select" @bind="moduleId">
+                <option value="">-- chọn module --</option>
+                @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Nội dung câu hỏi</label>
+            <textarea class="form-control" rows="2" @bind="content"></textarea>
+        </div>
+        <div class="row mb-2">
+            <div class="col">
+                <label class="form-label">Độ khó</label>
+                <select class="form-select" @bind="difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select>
+            </div>
+            <div class="col">
+                <label class="form-label">Giải thích (tùy chọn)</label>
+                <input class="form-control" @bind="explanation" />
+            </div>
+        </div>
+
+        <label class="form-label">Đáp án (tick đáp án đúng)</label>
+        @foreach (var opt in options)
+        {
+            <div class="input-group mb-1">
+                <div class="input-group-text">
+                    <input type="radio" name="correct" checked="@opt.IsCorrect" @onchange="() => SetCorrect(opt)" />
+                </div>
+                <input class="form-control" @bind="opt.Content" placeholder="Nội dung đáp án" />
+            </div>
+        }
+        <button class="btn btn-sm btn-outline-secondary mb-3" @onclick="AddOption" disabled="@(options.Count>=6)">+ Đáp án</button>
+
+        <div>
+            <button class="btn btn-primary" @onclick="Save">Lưu câu hỏi</button>
+            @if (message is not null) { <span class="ms-2 @(ok?"text-success":"text-danger")">@message</span> }
+        </div>
+    </div>
+</div>
+
+@code {
+    class OptInput { public string Content = ""; public bool IsCorrect; }
+
+    private List<Module>? modules;
+    private string? moduleId;
+    private string content = "", explanation = "", difficulty = "Medium";
+    private List<OptInput> options = new() { new(), new() };
+    private string? message;
+    private bool ok;
+
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery]
+    [Microsoft.AspNetCore.Components.Parameter] public Guid? Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+
+        if (Id is not null)
+        {
+            var q = await db.Questions.FindAsync(Id);
+            if (q is not null)
+            {
+                moduleId = q.ModuleId.ToString(); content = q.Content; explanation = q.Explanation ?? ""; difficulty = q.Difficulty;
+                var opts = await db.QuestionOptions.Where(o => o.QuestionId == q.Id).OrderBy(o => o.OrderIndex).ToListAsync();
+                if (opts.Count > 0) options = opts.Select(o => new OptInput { Content = o.Content, IsCorrect = o.IsCorrect }).ToList();
+            }
+        }
+    }
+
+    private void AddOption() { if (options.Count < 6) options.Add(new()); }
+    private void SetCorrect(OptInput o) { foreach (var x in options) x.IsCorrect = false; o.IsCorrect = true; }
+
+    private async Task Save()
+    {
+        if (!Guid.TryParse(moduleId, out var mid)) { ok = false; message = "Chọn module."; return; }
+        var valid = options.Where(o => !string.IsNullOrWhiteSpace(o.Content)).ToList();
+        if (valid.Count < 2) { ok = false; message = "Cần ít nhất 2 đáp án (AC-03a)."; return; }
+        if (valid.Count(o => o.IsCorrect) != 1) { ok = false; message = "Phải có đúng 1 đáp án đúng."; return; }
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        var q = new QuestionEntity { Id = Guid.NewGuid(), ModuleId = mid, Content = content.Trim(), Explanation = explanation, Difficulty = difficulty, Status = "Active", CreatedAt = DateTime.UtcNow };
+        db.Questions.Add(q);
+        int i = 0;
+        foreach (var o in valid)
+            db.QuestionOptions.Add(new QuestionOption { Id = Guid.NewGuid(), QuestionId = q.Id, Content = o.Content.Trim(), IsCorrect = o.IsCorrect, OrderIndex = i++ });
+        await db.SaveChangesAsync();
+        ok = true; message = "Đã lưu câu hỏi vào ngân hàng.";
+        content = explanation = ""; options = new() { new(), new() };
+    }
+}

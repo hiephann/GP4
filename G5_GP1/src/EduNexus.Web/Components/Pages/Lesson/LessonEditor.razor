@@ -1,0 +1,150 @@
+@page "/lesson-editor"
+@using LessonEntity = EduNexus.Api.Lesson.Entities.Lesson
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Lesson Editor</PageTitle>
+
+<div class="page-header">
+    <h2>Lesson Editor <span class="screen-tag">Lesson · FT-02</span></h2>
+    <p class="text-muted">Soạn nội dung bài học (video, markdown, tài liệu đính kèm).</p>
+</div>
+
+<div class="mb-3" style="max-width:480px">
+    <label class="form-label">Chọn module</label>
+    <select class="form-select" @onchange="OnModuleChanged">
+        <option value="">-- chọn --</option>
+        @if (modules is not null)
+        {
+            @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> }
+        }
+    </select>
+</div>
+
+@if (selectedModule is not null)
+{
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">Bài học</div>
+                <div class="list-group list-group-flush">
+                    @foreach (var l in lessons!)
+                    {
+                        <button class="list-group-item list-group-item-action @(l.Id==currentLesson?.Id ? "active":"")"
+                                @onclick="() => SelectLesson(l)">@l.Title</button>
+                    }
+                </div>
+                <div class="card-body d-flex gap-2">
+                    <input class="form-control form-control-sm" @bind="newLessonTitle" placeholder="Tên bài mới" />
+                    <button class="btn btn-sm btn-primary" @onclick="AddLesson">+</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            @if (currentLesson is not null)
+            {
+                <div class="card">
+                    <div class="card-header">Nội dung: @currentLesson.Title</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label">Loại nội dung</label>
+                            <select class="form-select" @bind="contentType">
+                                <option>Markdown</option>
+                                <option>YoutubeVideo</option>
+                                <option>File</option>
+                            </select>
+                        </div>
+                        @if (contentType == "Markdown")
+                        {
+                            <textarea class="form-control" rows="6" @bind="markdown" placeholder="# Nội dung markdown..."></textarea>
+                        }
+                        else if (contentType == "YoutubeVideo")
+                        {
+                            <input class="form-control" @bind="youtubeUrl" placeholder="https://youtube.com/watch?v=..." />
+                        }
+                        else
+                        {
+                            <input class="form-control" @bind="fileName" placeholder="Tên tệp (PDF/Word/ZIP)" />
+                        }
+                        <button class="btn btn-primary mt-2" @onclick="SaveContent">Lưu nội dung</button>
+                    </div>
+                </div>
+
+                <h6 class="mt-3">Nội dung hiện có</h6>
+                <ul>
+                    @foreach (var c in contents!)
+                    {
+                        <li><span class="badge bg-info">@c.ContentType</span> @(c.MarkdownText ?? c.YoutubeUrl ?? c.FileName)</li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<Module>? modules;
+    private Guid? selectedModule;
+    private List<LessonEntity>? lessons;
+    private LessonEntity? currentLesson;
+    private List<LessonContent>? contents;
+    private string newLessonTitle = "", contentType = "Markdown", markdown = "", youtubeUrl = "", fileName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+    }
+
+    private async Task OnModuleChanged(ChangeEventArgs e)
+    {
+        selectedModule = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        currentLesson = null; contents = null;
+        await LoadLessons();
+    }
+
+    private async Task LoadLessons()
+    {
+        if (selectedModule is null) { lessons = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        lessons = await db.Lessons.Where(l => l.ModuleId == selectedModule).OrderBy(l => l.OrderIndex).ToListAsync();
+    }
+
+    private async Task AddLesson()
+    {
+        if (selectedModule is null || string.IsNullOrWhiteSpace(newLessonTitle)) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var order = await db.Lessons.CountAsync(l => l.ModuleId == selectedModule) + 1;
+        db.Lessons.Add(new LessonEntity { Id = Guid.NewGuid(), ModuleId = selectedModule.Value, Title = newLessonTitle.Trim(), OrderIndex = order, CreatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+        newLessonTitle = "";
+        await LoadLessons();
+    }
+
+    private async Task SelectLesson(LessonEntity l)
+    {
+        currentLesson = l;
+        using var db = await DbFactory.CreateDbContextAsync();
+        contents = await db.LessonContents.Where(c => c.LessonId == l.Id).OrderBy(c => c.OrderIndex).ToListAsync();
+    }
+
+    private async Task SaveContent()
+    {
+        if (currentLesson is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var order = await db.LessonContents.CountAsync(c => c.LessonId == currentLesson.Id) + 1;
+        db.LessonContents.Add(new LessonContent
+        {
+            Id = Guid.NewGuid(),
+            LessonId = currentLesson.Id,
+            ContentType = contentType,
+            MarkdownText = contentType == "Markdown" ? markdown : null,
+            YoutubeUrl = contentType == "YoutubeVideo" ? youtubeUrl : null,
+            FileName = contentType == "File" ? fileName : null,
+            OrderIndex = order,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        markdown = youtubeUrl = fileName = "";
+        await SelectLesson(currentLesson);
+    }
+}

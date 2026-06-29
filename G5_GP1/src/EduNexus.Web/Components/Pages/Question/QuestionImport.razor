@@ -1,0 +1,88 @@
+@page "/question-import"
+@using QuestionEntity = EduNexus.Api.Question.Entities.Question
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Question Import</PageTitle>
+
+<div class="page-header">
+    <h2>Question Import <span class="screen-tag">Question · FT-03 · BR-20</span></h2>
+    <p class="text-muted">
+        Nhập hàng loạt. Mỗi dòng xử lý độc lập — dòng lỗi không chặn dòng hợp lệ.<br/>
+        Định dạng mỗi dòng: <code>Nội dung | Đáp án đúng | Sai1 | Sai2 | Sai3</code>
+    </p>
+</div>
+
+<div class="card" style="max-width:820px">
+    <div class="card-body">
+        <div class="mb-2">
+            <label class="form-label">Module</label>
+            <select class="form-select" @bind="moduleId">
+                <option value="">-- chọn module --</option>
+                @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+            </select>
+        </div>
+        <label class="form-label">Dữ liệu (mỗi dòng 1 câu hỏi)</label>
+        <textarea class="form-control mb-2" rows="6" @bind="raw"
+                  placeholder="Thủ đô Việt Nam? | Hà Nội | TP.HCM | Đà Nẵng | Huế"></textarea>
+        <button class="btn btn-primary" @onclick="Import">Nhập</button>
+    </div>
+</div>
+
+@if (results is not null)
+{
+    <div class="mt-3">
+        <div class="alert alert-info">
+            Tổng: @results.Count — Thành công: <strong class="text-success">@results.Count(r => r.ok)</strong> —
+            Lỗi: <strong class="text-danger">@results.Count(r => !r.ok)</strong>
+        </div>
+        <table class="table table-sm">
+            <thead><tr><th>Dòng</th><th>Kết quả</th><th>Ghi chú</th></tr></thead>
+            <tbody>
+                @foreach (var r in results)
+                {
+                    <tr class="@(r.ok ? "" : "table-danger")">
+                        <td>@r.line</td>
+                        <td>@(r.ok ? "OK" : "Lỗi")</td>
+                        <td>@r.note</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<Module>? modules;
+    private string? moduleId;
+    private string raw = "";
+    private List<(int line, bool ok, string note)>? results;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+    }
+
+    private async Task Import()
+    {
+        results = new();
+        if (!Guid.TryParse(moduleId, out var mid)) { results.Add((0, false, "Chưa chọn module.")); return; }
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        var lines = raw.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        int n = 0;
+        foreach (var lineRaw in lines)
+        {
+            n++;
+            var parts = lineRaw.Split('|', StringSplitOptions.TrimEntries);
+            if (parts.Length < 3) { results.Add((n, false, "Cần ít nhất nội dung + 2 đáp án.")); continue; }
+
+            var q = new QuestionEntity { Id = Guid.NewGuid(), ModuleId = mid, Content = parts[0], Difficulty = "Medium", Status = "Active", CreatedAt = DateTime.UtcNow };
+            db.Questions.Add(q);
+            for (int i = 1; i < parts.Length; i++)
+                db.QuestionOptions.Add(new QuestionOption { Id = Guid.NewGuid(), QuestionId = q.Id, Content = parts[i], IsCorrect = (i == 1), OrderIndex = i - 1 });
+            results.Add((n, true, $"Đã nhập ({parts.Length - 1} đáp án)."));
+        }
+        await db.SaveChangesAsync();
+    }
+}

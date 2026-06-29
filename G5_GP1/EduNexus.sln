@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{FB92CDF2-9CA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EduNexus.Api", "src\EduNexus.Api\EduNexus.Api.csproj", "{AE770B0E-CFAC-4DFA-9EEC-72BE4DD63047}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EduNexus.Web", "src\EduNexus.Web\EduNexus.Web.csproj", "{7696B1D2-E10B-4D91-B874-A92066875D28}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,8 +22,13 @@ Global
 		{AE770B0E-CFAC-4DFA-9EEC-72BE4DD63047}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE770B0E-CFAC-4DFA-9EEC-72BE4DD63047}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE770B0E-CFAC-4DFA-9EEC-72BE4DD63047}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7696B1D2-E10B-4D91-B874-A92066875D28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7696B1D2-E10B-4D91-B874-A92066875D28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7696B1D2-E10B-4D91-B874-A92066875D28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7696B1D2-E10B-4D91-B874-A92066875D28}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{AE770B0E-CFAC-4DFA-9EEC-72BE4DD63047} = {FB92CDF2-9CAA-4ABA-BC5E-6A7CECD4BF98}
+		{7696B1D2-E10B-4D91-B874-A92066875D28} = {FB92CDF2-9CAA-4ABA-BC5E-6A7CECD4BF98}
 	EndGlobalSection
 EndGlobal

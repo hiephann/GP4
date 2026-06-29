@@ -1,0 +1,108 @@
+@page "/assignment-detail"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Assignment Detail</PageTitle>
+
+<div class="page-header">
+    <h2>Assignment Detail <span class="screen-tag">Assignment · FT-05</span></h2>
+    <p class="text-muted">Đề bài + tiêu chí chấm điểm (rubric). Tổng tỷ trọng phải = 100%.</p>
+</div>
+
+<div class="mb-3" style="max-width:480px">
+    <label class="form-label">Chọn bài tập</label>
+    <select class="form-select" value="@selectedId" @onchange="OnChanged">
+        <option value="">-- chọn --</option>
+        @if (items is not null)
+        {
+            @foreach (var a in items) { <option value="@a.Id">@a.Title</option> }
+        }
+    </select>
+</div>
+
+@if (current is not null)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <label class="form-label">Đề bài (Markdown)</label>
+            <textarea class="form-control mb-2" rows="3" @bind="current.PromptMarkdown"></textarea>
+            <label class="form-label">Hạn nộp</label>
+            <input type="date" class="form-control mb-2" @bind="dueDate" style="max-width:220px" />
+            <button class="btn btn-primary" @onclick="SavePrompt">Lưu đề bài</button>
+        </div>
+    </div>
+
+    <h6>Rubric — Tổng tỷ trọng: <span class="@(TotalWeight==100?"text-success":"text-danger")">@TotalWeight%</span></h6>
+    <table class="table">
+        <thead><tr><th>Tiêu chí</th><th>Tỷ trọng %</th><th>Điểm tối đa</th></tr></thead>
+        <tbody>
+            @foreach (var c in criteria!)
+            {
+                <tr><td>@c.Name</td><td>@c.Weight</td><td>@c.MaxScore</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="card">
+        <div class="card-body d-flex gap-2 align-items-end flex-wrap">
+            <div><label class="form-label">Tên tiêu chí</label><input class="form-control" @bind="cName" /></div>
+            <div><label class="form-label">Tỷ trọng %</label><input type="number" class="form-control" @bind="cWeight" style="width:120px" /></div>
+            <div><label class="form-label">Điểm tối đa</label><input type="number" class="form-control" @bind="cMax" style="width:120px" /></div>
+            <button class="btn btn-outline-primary" @onclick="AddCriterion">+ Thêm tiêu chí</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<AssignmentItem>? items;
+    private Guid? selectedId;
+    private AssignmentItem? current;
+    private List<RubricCriterion>? criteria;
+    private DateTime? dueDate;
+    private string cName = "";
+    private decimal cWeight, cMax;
+    private decimal TotalWeight => criteria?.Sum(x => x.Weight) ?? 0;
+
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery]
+    [Microsoft.AspNetCore.Components.Parameter] public Guid? Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        items = await db.Assignments.OrderBy(a => a.Title).ToListAsync();
+        if (Id is not null) { selectedId = Id; await LoadCurrent(); }
+    }
+
+    private async Task OnChanged(ChangeEventArgs e)
+    {
+        selectedId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadCurrent();
+    }
+
+    private async Task LoadCurrent()
+    {
+        if (selectedId is null) { current = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        current = await db.Assignments.FindAsync(selectedId);
+        dueDate = current?.DueDate;
+        criteria = await db.RubricCriteria.Where(c => c.AssignmentId == selectedId).OrderBy(c => c.OrderIndex).ToListAsync();
+    }
+
+    private async Task SavePrompt()
+    {
+        if (current is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var a = await db.Assignments.FindAsync(current.Id);
+        if (a is not null) { a.PromptMarkdown = current.PromptMarkdown; a.DueDate = dueDate; await db.SaveChangesAsync(); }
+    }
+
+    private async Task AddCriterion()
+    {
+        if (selectedId is null || string.IsNullOrWhiteSpace(cName) || cWeight <= 0) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var order = await db.RubricCriteria.CountAsync(c => c.AssignmentId == selectedId) + 1;
+        db.RubricCriteria.Add(new RubricCriterion { Id = Guid.NewGuid(), AssignmentId = selectedId.Value, Name = cName.Trim(), Weight = cWeight, MaxScore = cMax, OrderIndex = order });
+        await db.SaveChangesAsync();
+        cName = ""; cWeight = 0; cMax = 0;
+        await LoadCurrent();
+    }
+}

@@ -1,0 +1,82 @@
+@page "/progress"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Personal Progress</PageTitle>
+
+<div class="page-header">
+    <h2>Personal Progress <span class="screen-tag">Common · FT-12</span></h2>
+    <p class="text-muted">Tiến trình học course của học viên.</p>
+</div>
+
+<div class="mb-3" style="max-width:420px">
+    <label class="form-label">Chọn học viên</label>
+    <select class="form-select" @onchange="OnStudentChanged">
+        <option value="">-- chọn --</option>
+        @if (students is not null)
+        {
+            @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> }
+        }
+    </select>
+</div>
+
+@if (selectedId is not null)
+{
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Tiến độ bài học</div>
+                <div class="card-body">
+                    <p>Bài đã hoàn thành: <strong>@completedLessons</strong> / @totalLessons</p>
+                    <div class="progress" style="height:22px">
+                        <div class="progress-bar" style="width:@(Percent)%">@Percent%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Lịch sử điểm Quiz</div>
+                <div class="card-body">
+                    @if (quizScores!.Count == 0) { <span class="text-muted">Chưa có bài quiz.</span> }
+                    else
+                    {
+                        <table class="table table-sm">
+                            <thead><tr><th>Ngày</th><th>Điểm</th></tr></thead>
+                            <tbody>
+                                @foreach (var q in quizScores)
+                                {
+                                    <tr><td>@(q.SubmittedAt?.ToString("dd/MM HH:mm"))</td><td>@q.Score</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<User>? students;
+    private Guid? selectedId;
+    private int completedLessons, totalLessons;
+    private List<QuizAttempt>? quizScores;
+    private int Percent => totalLessons == 0 ? 0 : (int)Math.Round(completedLessons * 100.0 / totalLessons);
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+    }
+
+    private async Task OnStudentChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { selectedId = null; return; }
+        selectedId = id;
+        using var db = await DbFactory.CreateDbContextAsync();
+        totalLessons = await db.Lessons.CountAsync();
+        completedLessons = await db.LessonProgress.CountAsync(p => p.StudentId == id && p.IsCompleted);
+        quizScores = await db.QuizAttempts.Where(a => a.StudentId == id && a.SubmittedAt != null)
+                                          .OrderBy(a => a.SubmittedAt).ToListAsync();
+    }
+}

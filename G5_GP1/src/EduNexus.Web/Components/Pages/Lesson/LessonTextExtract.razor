@@ -1,0 +1,49 @@
+@page "/lesson-text-extract"
+
+<PageTitle>Lesson Text Extract</PageTitle>
+
+<div class="page-header">
+    <h2>Lesson Text Extract <span class="screen-tag">Lesson · FT-02</span></h2>
+    <p class="text-muted">Lấy transcript từ YouTube API, đẩy sang GenAI để format thành lesson summary.</p>
+</div>
+
+<div class="card" style="max-width:720px">
+    <div class="card-body">
+        <label class="form-label">Đường dẫn YouTube</label>
+        <div class="input-group mb-3">
+            <input class="form-control" @bind="url" placeholder="https://www.youtube.com/watch?v=..." />
+            <button class="btn btn-primary" @onclick="Extract">
+                <span class="bi bi-youtube"></span> Trích & Tóm tắt
+            </button>
+        </div>
+
+        @if (loading)
+        {
+            <div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm"></div> Đang xử lý...</div>
+        }
+        else if (summary is not null)
+        {
+            <div class="alert alert-success">
+                <h6>Lesson Summary (demo)</h6>
+                <p class="mb-0">@summary</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string url = "";
+    private string? summary;
+    private bool loading;
+
+    private async Task Extract()
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+        loading = true; summary = null;
+        await Task.Delay(600); // mô phỏng gọi YouTube API + GenAI
+        summary = $"[Tóm tắt AI demo] Video {url} gồm các ý chính: giới thiệu chủ đề, " +
+                  "trình bày khái niệm cốt lõi, ví dụ minh họa và tổng kết. " +
+                  "(Thực tế: lấy transcript qua YouTube Data API rồi format qua GenAI — AC-02f, ưu tiên tiếng Việt.)";
+        loading = false;
+    }
+}

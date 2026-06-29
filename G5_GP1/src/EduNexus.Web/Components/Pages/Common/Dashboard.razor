@@ -1,0 +1,83 @@
+@page "/dashboard"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Student Dashboard</PageTitle>
+
+<div class="page-header">
+    <h2>Student Dashboard <span class="screen-tag">Common</span></h2>
+    <p class="text-muted">Courses, classes và packages mà học viên đã đăng ký.</p>
+</div>
+
+<div class="mb-3" style="max-width:420px">
+    <label class="form-label">Chọn học viên</label>
+    <select class="form-select" @onchange="OnStudentChanged">
+        <option value="">-- chọn --</option>
+        @if (students is not null)
+        {
+            @foreach (var s in students)
+            {
+                <option value="@s.Id">@s.DisplayName (@s.Email)</option>
+            }
+        }
+    </select>
+</div>
+
+@if (selectedId is not null)
+{
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">Khóa học (AccessGrant)</div>
+                <div class="card-body">
+                    @if (grants!.Count == 0) { <span class="text-muted">Không có.</span> }
+                    else { <ul>@foreach (var g in grants) { <li>@g.GrantType — @(g.ExpiresAt?.ToString("dd/MM/yyyy") ?? "vĩnh viễn")</li> }</ul> }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">Lớp học</div>
+                <div class="card-body">
+                    @if (classNames!.Count == 0) { <span class="text-muted">Không có.</span> }
+                    else { <ul>@foreach (var c in classNames) { <li>@c</li> }</ul> }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">Gói đăng ký</div>
+                <div class="card-body">
+                    @if (subs!.Count == 0) { <span class="text-muted">Không có.</span> }
+                    else { <ul>@foreach (var s in subs) { <li>Hết hạn @s.ExpiresAt.ToString("dd/MM/yyyy") (@s.Status)</li> }</ul> }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<User>? students;
+    private Guid? selectedId;
+    private List<AccessGrant>? grants;
+    private List<PackageSubscription>? subs;
+    private List<string>? classNames;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+    }
+
+    private async Task OnStudentChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { selectedId = null; return; }
+        selectedId = id;
+        using var db = await DbFactory.CreateDbContextAsync();
+        grants = await db.AccessGrants.Where(g => g.StudentId == id && !g.IsRevoked).ToListAsync();
+        subs = await db.PackageSubscriptions.Where(s => s.StudentId == id).ToListAsync();
+        classNames = await (from cs in db.ClassStudents
+                            join c in db.Classes on cs.ClassId equals c.Id
+                            where cs.StudentId == id
+                            select c.Name).ToListAsync();
+    }
+}

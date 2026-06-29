@@ -1,0 +1,57 @@
+@page "/flashcard-library"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Flashcard Library</PageTitle>
+
+<div class="page-header">
+    <h2>Flashcard Library <span class="screen-tag">Flashcard</span></h2>
+    <p class="text-muted">Thư viện thẻ ghi nhớ theo nhóm chủ đề.</p>
+</div>
+
+<div class="mb-3" style="max-width:480px">
+    <label class="form-label">Chọn module</label>
+    <select class="form-select" @onchange="OnModuleChanged">
+        <option value="">-- chọn --</option>
+        @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+    </select>
+</div>
+
+@if (groups is not null)
+{
+    @foreach (var g in groups)
+    {
+        <h5>@g.Name <span class="badge bg-secondary">@cardsByGroup[g.Id].Count thẻ</span></h5>
+        <div class="card-grid mb-4">
+            @foreach (var c in cardsByGroup[g.Id])
+            {
+                <div class="card"><div class="card-body">
+                    <div class="fw-bold">@c.FrontText</div>
+                    <div class="text-muted small">@c.BackText</div>
+                </div></div>
+            }
+        </div>
+    }
+    @if (groups.Count == 0) { <p class="text-muted">Module chưa có nhóm thẻ.</p> }
+}
+
+@code {
+    private List<Module>? modules;
+    private List<FlashcardGroup>? groups;
+    private Dictionary<Guid, List<FlashcardItem>> cardsByGroup = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+    }
+
+    private async Task OnModuleChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { groups = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        groups = await db.FlashcardGroups.Where(g => g.ModuleId == id).OrderBy(g => g.OrderIndex).ToListAsync();
+        cardsByGroup.Clear();
+        foreach (var g in groups)
+            cardsByGroup[g.Id] = await db.Flashcards.Where(c => c.GroupId == g.Id).OrderBy(c => c.OrderIndex).ToListAsync();
+    }
+}

@@ -1,0 +1,108 @@
+@page "/login"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>User Login</PageTitle>
+
+<div class="page-header">
+    <h2>User Login <span class="screen-tag">Common · FT-14</span></h2>
+    <p class="text-muted">Đăng nhập bằng email (kiểm tra trong bảng Users) hoặc Google Login.</p>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" @bind="email" placeholder="student@edunexus.vn" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Mật khẩu</label>
+                    <input type="password" class="form-control" @bind="password" />
+                </div>
+                <button class="btn btn-primary" @onclick="DoLogin">Đăng nhập</button>
+                <button class="btn btn-outline-danger ms-2" @onclick="GoogleLogin">
+                    <span class="bi bi-google"></span> Google Login
+                </button>
+            </div>
+        </div>
+
+        @if (message is not null)
+        {
+            <div class="alert @(success ? "alert-success" : "alert-danger") mt-3">@message</div>
+        }
+    </div>
+
+    <div class="col-md-7">
+        <h6 class="text-muted">Tài khoản trong hệ thống</h6>
+        @if (users is null)
+        {
+            <p>Đang tải...</p>
+        }
+        else
+        {
+            <table class="table table-sm table-striped">
+                <thead><tr><th>Email</th><th>Tên</th><th>Provider</th><th>Active</th></tr></thead>
+                <tbody>
+                    @foreach (var u in users)
+                    {
+                        <tr>
+                            <td>@u.Email</td><td>@u.DisplayName</td><td>@u.AuthProvider</td>
+                            <td>@(u.IsActive ? "Có" : "Không")</td>
+                        </tr>
+                    }
+                    @if (users.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-muted">Chưa có user. Bấm nút bên dưới để tạo tài khoản demo.</td></tr>
+                    }
+                </tbody>
+            </table>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="CreateDemoUser">+ Tạo user demo</button>
+        }
+    </div>
+</div>
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string? message;
+    private bool success;
+    private List<User>? users;
+
+    protected override async Task OnInitializedAsync() => await LoadUsers();
+
+    private async Task LoadUsers()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        users = await db.Users.OrderBy(u => u.Email).ToListAsync();
+    }
+
+    private async Task DoLogin()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user is null) { success = false; message = "Email không tồn tại."; }
+        else if (!user.IsActive) { success = false; message = "Tài khoản bị vô hiệu hóa."; }
+        else { success = true; message = $"Đăng nhập thành công: {user.DisplayName}"; }
+    }
+
+    private void GoogleLogin() { success = true; message = "Demo: luồng Google OAuth (BR-26 tự liên kết tài khoản)."; }
+
+    private async Task CreateDemoUser()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var n = await db.Users.CountAsync() + 1;
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Email = $"student{n}@edunexus.vn",
+            DisplayName = $"Học viên {n}",
+            AuthProvider = "Local",
+            IsEmailVerified = true,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        await LoadUsers();
+    }
+}

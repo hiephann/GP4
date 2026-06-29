@@ -1,0 +1,57 @@
+@page "/quiz-history"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Quiz History</PageTitle>
+
+<div class="page-header">
+    <h2>Quiz History <span class="screen-tag">Quiz · FT-07</span></h2>
+    <p class="text-muted">Lịch sử các bài kiểm tra luyện tập của học viên.</p>
+</div>
+
+<div class="mb-3" style="max-width:420px">
+    <label class="form-label">Chọn học viên</label>
+    <select class="form-select" @onchange="OnStudentChanged">
+        <option value="">-- chọn --</option>
+        @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
+    </select>
+</div>
+
+@if (attempts is not null)
+{
+    <table class="table table-striped">
+        <thead><tr><th>Ngày nộp</th><th>Điểm</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var a in attempts)
+            {
+                <tr>
+                    <td>@a.SubmittedAt?.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>@a.Score / 10</td>
+                    <td>
+                        <a class="btn btn-sm btn-outline-primary" href="@($"quiz-results?id={a.Id}")">Kết quả</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="@($"quiz-review?id={a.Id}")">Review</a>
+                    </td>
+                </tr>
+            }
+            @if (attempts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bài kiểm tra.</td></tr> }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<User>? students;
+    private List<QuizAttempt>? attempts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+    }
+
+    private async Task OnStudentChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { attempts = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        attempts = await db.QuizAttempts.Where(a => a.StudentId == id && a.SubmittedAt != null)
+                                        .OrderByDescending(a => a.SubmittedAt).ToListAsync();
+    }
+}

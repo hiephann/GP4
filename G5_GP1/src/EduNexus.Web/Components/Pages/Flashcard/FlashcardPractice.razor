@@ -1,0 +1,67 @@
+@page "/flashcard-practice"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Flashcard Practice</PageTitle>
+
+<div class="page-header">
+    <h2>Flashcard Practice <span class="screen-tag">Flashcard · FT-06</span></h2>
+    <p class="text-muted">Lật thẻ để ôn luyện; đánh dấu "Đã thuộc" / "Chưa thuộc".</p>
+</div>
+
+<div class="mb-3" style="max-width:480px">
+    <label class="form-label">Chọn module</label>
+    <select class="form-select" @onchange="OnModuleChanged">
+        <option value="">-- chọn --</option>
+        @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+    </select>
+</div>
+
+@if (cards is not null && cards.Count > 0)
+{
+    var card = cards[index];
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="flashcard" @onclick="() => showBack = !showBack">
+                <h4>@(showBack ? card.BackText : card.FrontText)</h4>
+            </div>
+            <p class="text-center text-muted mt-2">Thẻ @(index+1)/@cards.Count — bấm để lật. Đã thuộc: @learned</p>
+            <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-outline-danger" @onclick="() => Next(false)">Chưa thuộc</button>
+                <button class="btn btn-success" @onclick="() => Next(true)">Đã thuộc</button>
+            </div>
+        </div>
+    </div>
+}
+else if (cards is not null)
+{
+    <p class="text-muted">Module chưa có thẻ nào.</p>
+}
+
+@code {
+    private List<Module>? modules;
+    private List<FlashcardItem>? cards;
+    private int index, learned;
+    private bool showBack;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+    }
+
+    private async Task OnModuleChanged(ChangeEventArgs e)
+    {
+        index = 0; learned = 0; showBack = false;
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { cards = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        cards = await db.Flashcards.Where(c => c.ModuleId == id).OrderBy(c => c.OrderIndex).ToListAsync();
+    }
+
+    private void Next(bool isLearned)
+    {
+        if (isLearned) learned++;
+        showBack = false;
+        if (cards is not null && index < cards.Count - 1) index++;
+        else index = 0; // quay lại đầu
+    }
+}

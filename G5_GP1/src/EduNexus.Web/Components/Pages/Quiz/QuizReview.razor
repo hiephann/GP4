@@ -1,0 +1,67 @@
+@page "/quiz-review"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Quiz Review</PageTitle>
+
+<div class="page-header">
+    <h2>Quiz Review <span class="screen-tag">Quiz · FT-07</span></h2>
+    <p class="text-muted">Xem từng câu đúng/sai, đáp án đúng và giải thích.</p>
+</div>
+
+@if (Id is null)
+{
+    <div class="alert alert-info">Chọn một lần làm bài ở <a href="quiz-history">Quiz History</a>.</div>
+}
+else if (items is null)
+{
+    <p>Đang tải...</p>
+}
+else
+{
+    @foreach (var (it, idx) in items.Select((x, i) => (x, i)))
+    {
+        <div class="card mb-2 border-@(it.IsCorrect ? "success" : "danger")">
+            <div class="card-body">
+                <p class="fw-bold">Câu @(idx + 1): @it.Content
+                    <span class="badge bg-@(it.IsCorrect ? "success" : "danger")">@(it.IsCorrect ? "Đúng" : "Sai")</span>
+                </p>
+                <ul class="list-unstyled mb-1">
+                    @foreach (var o in it.Options)
+                    {
+                        <li>
+                            @if (o.IsCorrect) { <span class="text-success">✔</span> }
+                            else if (o.Id == it.SelectedOptionId) { <span class="text-danger">✘</span> }
+                            else { <span style="display:inline-block;width:1em"></span> }
+                            @o.Content
+                        </li>
+                    }
+                </ul>
+                @if (!string.IsNullOrEmpty(it.Explanation)) { <div class="text-muted small">Giải thích: @it.Explanation</div> }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    record ReviewItem(string Content, string? Explanation, Guid? SelectedOptionId, bool IsCorrect, List<QuestionOption> Options);
+
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery]
+    [Microsoft.AspNetCore.Components.Parameter] public Guid? Id { get; set; }
+
+    private List<ReviewItem>? items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var answers = await db.QuizAttemptAnswers.Where(a => a.AttemptId == Id).ToListAsync();
+        items = new();
+        foreach (var a in answers)
+        {
+            var q = await db.Questions.FindAsync(a.QuestionId);
+            if (q is null) continue;
+            var opts = await db.QuestionOptions.Where(o => o.QuestionId == a.QuestionId).OrderBy(o => o.OrderIndex).ToListAsync();
+            items.Add(new ReviewItem(q.Content, q.Explanation, a.SelectedOptionId, a.IsCorrect == true, opts));
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(dotnet add *)",
+      "Bash(dotnet build *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5112/)",
+      "Bash(curl -s http://localhost:5112/login)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5112/login)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5112/courses)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5112/quiz-history)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='dotnet.exe'\" | Where-Object { $_.CommandLine -match 'EduNexus.Web' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; \"stopped $\\($_.ProcessId\\)\" }; Get-Process dotnet -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count)",
+      "Bash(curl -s -o /dev/null -w \"port5112: %{http_code}\\\\n\" --max-time 3 http://localhost:5112/)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='dotnet.exe'\" | Where-Object { $_.CommandLine -match 'EduNexus.Web' } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force; \"stopped $\\($_.ProcessId\\)\" } catch {} }; Start-Sleep -Seconds 2; try { \\(Invoke-WebRequest http://localhost:5112/ -TimeoutSec 3 -UseBasicParsing\\).StatusCode } catch { \"port closed\" })"
+    ]
+  }
+}

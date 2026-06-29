@@ -1,0 +1,80 @@
+@page "/"
+
+<PageTitle>EduNexus — G5</PageTitle>
+
+<div class="page-header">
+    <h1>EduNexus <small class="text-muted">— Nhóm G5</small></h1>
+    <p class="text-muted">Giao diện 26 màn hình theo phạm vi dự án, kết nối SQL Server (DB <code>EduNexus</code>).</p>
+</div>
+
+<div class="row g-3">
+    @foreach (var grp in Groups)
+    {
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-header fw-bold">@grp.Name</div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var s in grp.Screens)
+                    {
+                        <li class="list-group-item">
+                            <a href="@s.Href">@s.Title</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    record Screen(string Title, string Href);
+    record Group(string Name, Screen[] Screens);
+
+    static readonly Group[] Groups =
+    {
+        new("Common", new Screen[]
+        {
+            new("User Login", "login"),
+            new("Student Dashboard", "dashboard"),
+            new("Personal Progress", "progress"),
+            new("Course List", "courses"),
+            new("Course Structure", "course-structure"),
+        }),
+        new("Lesson", new Screen[]
+        {
+            new("Lesson Editor", "lesson-editor"),
+            new("AI Lesson Staging", "ai-lesson-staging"),
+            new("Lesson Text Extract", "lesson-text-extract"),
+            new("Lesson View", "lesson-view"),
+        }),
+        new("Assignment", new Screen[]
+        {
+            new("Assignment List", "assignments"),
+            new("Assignment Detail", "assignment-detail"),
+            new("Assignment Submit", "assignment-submit"),
+            new("Assignment Result", "assignment-result"),
+        }),
+        new("Flashcard", new Screen[]
+        {
+            new("Flashcard Editor", "flashcard-editor"),
+            new("AI Flashcard Staging", "ai-flashcard-staging"),
+            new("Flashcard Library", "flashcard-library"),
+            new("Flashcard Practice", "flashcard-practice"),
+        }),
+        new("Question", new Screen[]
+        {
+            new("Question Bank", "question-bank"),
+            new("Question Detail", "question-detail"),
+            new("AI Question Staging", "ai-question-staging"),
+            new("Question Import", "question-import"),
+        }),
+        new("Quiz", new Screen[]
+        {
+            new("Quiz History", "quiz-history"),
+            new("New Quiz", "new-quiz"),
+            new("Quiz Taking", "quiz-taking"),
+            new("Quiz Results", "quiz-results"),
+            new("Quiz Review", "quiz-review"),
+        }),
+    };
+}

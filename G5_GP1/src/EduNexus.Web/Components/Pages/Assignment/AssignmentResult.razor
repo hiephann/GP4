@@ -1,0 +1,87 @@
+@page "/assignment-result"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Assignment Result</PageTitle>
+
+<div class="page-header">
+    <h2>Assignment Result <span class="screen-tag">Assignment · FT-08</span></h2>
+    <p class="text-muted">Xem kết quả đánh giá (điểm, feedback, chi tiết theo rubric).</p>
+</div>
+
+<div class="mb-3" style="max-width:560px">
+    <label class="form-label">Chọn bài nộp</label>
+    <select class="form-select" @onchange="OnChanged">
+        <option value="">-- chọn --</option>
+        @if (submissions is not null)
+        {
+            @foreach (var s in submissions) { <option value="@s.Id">@s.Label</option> }
+        }
+    </select>
+</div>
+
+@if (current is not null)
+{
+    <div class="card">
+        <div class="card-body">
+            <p><strong>Trạng thái:</strong> <span class="badge bg-secondary">@current.Status</span></p>
+            <p><strong>Điểm cuối:</strong> @(current.FinalScore?.ToString() ?? "Chưa có (chờ GV xác nhận — BR-10)")</p>
+            <p><strong>Nhận xét GV:</strong> @(current.TeacherComment ?? "-")</p>
+            <hr />
+            <h6>Bài làm</h6>
+            <pre style="white-space:pre-wrap">@current.ContentText</pre>
+
+            @if (current.Status != "Confirmed")
+            {
+                <div class="alert alert-warning">Mô phỏng: GV xác nhận điểm cuối cùng.</div>
+                <div class="input-group" style="max-width:360px">
+                    <input type="number" class="form-control" @bind="scoreInput" placeholder="Điểm" />
+                    <input class="form-control" @bind="commentInput" placeholder="Nhận xét" />
+                    <button class="btn btn-success" @onclick="Confirm">Xác nhận</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    record SubOption(Guid Id, string Label);
+    private List<SubOption>? submissions;
+    private Submission? current;
+    private decimal scoreInput;
+    private string commentInput = "";
+
+    protected override async Task OnInitializedAsync() => await LoadList();
+
+    private async Task LoadList()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        submissions = await (from s in db.Submissions
+                             join a in db.Assignments on s.AssignmentId equals a.Id
+                             join u in db.Users on s.StudentId equals u.Id
+                             orderby s.SubmittedAt descending
+                             select new SubOption(s.Id, a.Title + " — " + u.DisplayName)).ToListAsync();
+    }
+
+    private async Task OnChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { current = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        current = await db.Submissions.FindAsync(id);
+    }
+
+    private async Task Confirm()
+    {
+        if (current is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var s = await db.Submissions.FindAsync(current.Id);
+        if (s is not null)
+        {
+            s.FinalScore = scoreInput;
+            s.TeacherComment = commentInput;
+            s.Status = "Confirmed";
+            s.ConfirmedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            current = s;
+        }
+    }
+}

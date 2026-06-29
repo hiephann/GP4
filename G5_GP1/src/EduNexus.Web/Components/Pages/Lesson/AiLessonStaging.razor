@@ -1,0 +1,84 @@
+@page "/ai-lesson-staging"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>AI Lesson Staging</PageTitle>
+
+<div class="page-header">
+    <h2>AI Lesson Staging <span class="screen-tag">Lesson · FT-02 · BR-07</span></h2>
+    <p class="text-muted">Tạo lesson text bằng AI; SME xem lại, chỉnh sửa và phê duyệt.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <label class="form-label">Đề cương / văn bản nguồn</label>
+        <textarea class="form-control mb-2" rows="3" @bind="outline" placeholder="Nhập đề cương để AI mở rộng thành bài giảng..."></textarea>
+        <button class="btn btn-primary" @onclick="Generate">
+            <span class="bi bi-robot"></span> Sinh nội dung (demo)
+        </button>
+    </div>
+</div>
+
+<h6>Khu vực chờ duyệt</h6>
+@if (drafts is null) { <p>Đang tải...</p> }
+else
+{
+    <table class="table">
+        <thead><tr><th>Nội dung sinh ra</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var d in drafts)
+            {
+                <tr>
+                    <td style="max-width:520px">@d.GeneratedText</td>
+                    <td><span class="badge bg-@(d.Status=="Approved"?"success":"warning")">@d.Status</span></td>
+                    <td>
+                        @if (d.Status == "Pending")
+                        {
+                            <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (drafts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bản nháp.</td></tr> }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string outline = "";
+    private List<AiLessonDraft>? drafts;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        drafts = await db.AiLessonDrafts.OrderByDescending(d => d.CreatedAt).ToListAsync();
+    }
+
+    private async Task Generate()
+    {
+        if (string.IsNullOrWhiteSpace(outline)) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
+        db.AiLessonDrafts.Add(new AiLessonDraft
+        {
+            Id = Guid.NewGuid(),
+            CreatedById = anyUser ?? Guid.Empty,
+            SourceText = outline,
+            GeneratedText = $"[AI demo] Bài giảng mở rộng từ: \"{outline}\". (Nội dung do AI sinh — chờ SME duyệt.)",
+            Status = "Pending",
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        outline = "";
+        await Load();
+    }
+
+    private async Task Approve(Guid id)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var d = await db.AiLessonDrafts.FindAsync(id);
+        if (d is not null) { d.Status = "Approved"; await db.SaveChangesAsync(); }
+        await Load();
+    }
+}

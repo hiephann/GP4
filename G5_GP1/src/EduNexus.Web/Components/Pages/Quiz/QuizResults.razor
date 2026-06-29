@@ -1,0 +1,46 @@
+@page "/quiz-results"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Quiz Results</PageTitle>
+
+<div class="page-header">
+    <h2>Quiz Results <span class="screen-tag">Quiz · FT-07</span></h2>
+    <p class="text-muted">Điểm tổng. Kết quả luyện tập không tính vào sổ điểm chính thức (BR-06).</p>
+</div>
+
+@if (Id is null)
+{
+    <div class="alert alert-info">Chọn một lần làm bài ở <a href="quiz-history">Quiz History</a>.</div>
+}
+else if (attempt is null)
+{
+    <p>Đang tải...</p>
+}
+else
+{
+    <div class="card text-center" style="max-width:420px">
+        <div class="card-body">
+            <h1 class="display-3">@attempt.Score<small class="text-muted fs-5">/10</small></h1>
+            <p>Đúng @correct / @total câu</p>
+            <p class="text-muted">Nộp lúc @attempt.SubmittedAt?.ToString("dd/MM/yyyy HH:mm")</p>
+            <a class="btn btn-outline-primary" href="@($"quiz-review?id={attempt.Id}")">Xem chi tiết (Review)</a>
+        </div>
+    </div>
+}
+
+@code {
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery]
+    [Microsoft.AspNetCore.Components.Parameter] public Guid? Id { get; set; }
+
+    private QuizAttempt? attempt;
+    private int correct, total;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        attempt = await db.QuizAttempts.FindAsync(Id);
+        total = await db.QuizAttemptAnswers.CountAsync(a => a.AttemptId == Id);
+        correct = await db.QuizAttemptAnswers.CountAsync(a => a.AttemptId == Id && a.IsCorrect == true);
+    }
+}

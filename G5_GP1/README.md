@@ -5,10 +5,24 @@ toàn hệ thống + project skeleton (code module chưa chi tiết) cho các ch
 nhóm màn hình trong file phạm vi (`*.xlsx`).
 
 ## Công nghệ
-- **.NET 8 (LTS)** — ASP.NET Core Web API (pin SDK qua `global.json`)
+- **.NET 8 (LTS)** — pin SDK qua `global.json`
+- **EduNexus.Api**: ASP.NET Core Web API (skeleton) — kiến trúc **package-by-feature**,
+  đủ layer **Controller → Service → Repository → Entity / DTO**
+- **EduNexus.Web**: **Blazor Server** — giao diện 26 màn hình, truy cập **EF Core DbContext
+  trực tiếp** vào SQL Server (chạy được ngay với DB thật)
 - **SQL Server** + **EF Core 8**
-- Kiến trúc: **single project, package-by-feature**, đủ layer
-  **Controller → Service → Repository → Entity / DTO**
+
+## Giao diện (Blazor) — 26 màn hình
+Project `src/EduNexus.Web` chứa giao diện cho toàn bộ 26 màn hình, gom theo nhóm trong
+`Components/Pages/{Common,Lesson,Assignment,Flashcard,Question,Quiz}`. Menu trái liệt kê
+đầy đủ; trang chủ là bảng điều hướng tới từng màn hình.
+
+Chạy giao diện:
+```bash
+dotnet run --project src/EduNexus.Web
+```
+Mở trình duyệt tại URL hiển thị (vd `http://localhost:5112`). Connection string mặc định
+(`src/EduNexus.Web/appsettings.json`): `Server=localhost; User Id=sa; Password=123456`.
 
 ## Phân công nhóm màn hình (mỗi thành viên 1 nhóm, theo thứ tự trong xlsx)
 

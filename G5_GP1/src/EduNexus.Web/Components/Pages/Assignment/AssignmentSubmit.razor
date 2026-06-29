@@ -1,0 +1,70 @@
+@page "/assignment-submit"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Assignment Submit</PageTitle>
+
+<div class="page-header">
+    <h2>Assignment Submit <span class="screen-tag">Assignment · FT-08</span></h2>
+    <p class="text-muted">Nộp bài; AI tự động đánh giá bất đồng bộ. Mỗi học viên chỉ nộp 1 lần.</p>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <label class="form-label">Bài tập</label>
+        <select class="form-select mb-2" @bind="assignmentId">
+            <option value="">-- chọn --</option>
+            @if (items is not null) { @foreach (var a in items) { <option value="@a.Id">@a.Title</option> } }
+        </select>
+        <label class="form-label">Học viên</label>
+        <select class="form-select mb-2" @bind="studentId">
+            <option value="">-- chọn --</option>
+            @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
+        </select>
+    </div>
+    <div class="col-md-8">
+        <label class="form-label">Bài làm (tối đa 20.000 ký tự)</label>
+        <textarea class="form-control mb-2" rows="8" maxlength="20000" @bind="content"></textarea>
+        <button class="btn btn-primary" @onclick="Submit">Nộp bài</button>
+        @if (message is not null) { <div class="alert @(ok?"alert-success":"alert-danger") mt-2">@message</div> }
+    </div>
+</div>
+
+@code {
+    private List<AssignmentItem>? items;
+    private List<User>? students;
+    private string? assignmentId, studentId;
+    private string content = "";
+    private string? message;
+    private bool ok;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        items = await db.Assignments.OrderBy(a => a.Title).ToListAsync();
+        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+    }
+
+    private async Task Submit()
+    {
+        if (!Guid.TryParse(assignmentId, out var aid) || !Guid.TryParse(studentId, out var sid))
+        { ok = false; message = "Chọn bài tập và học viên."; return; }
+        if (string.IsNullOrWhiteSpace(content)) { ok = false; message = "Bài nộp rỗng bị từ chối (NAC-08-d)."; return; }
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        if (await db.Submissions.AnyAsync(s => s.AssignmentId == aid && s.StudentId == sid))
+        { ok = false; message = "Đã nộp rồi — không nộp lần 2 (NAC-08-b)."; return; }
+
+        db.Submissions.Add(new Submission
+        {
+            Id = Guid.NewGuid(),
+            AssignmentId = aid,
+            StudentId = sid,
+            ContentText = content,
+            SubmittedAt = DateTime.UtcNow,
+            Status = "Submitted"
+        });
+        await db.SaveChangesAsync();
+        content = "";
+        ok = true; message = "Nộp bài thành công. Hệ thống sẽ chấm sơ bộ bằng AI (bất đồng bộ).";
+    }
+}

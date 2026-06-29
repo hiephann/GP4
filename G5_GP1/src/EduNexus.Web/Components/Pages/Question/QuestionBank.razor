@@ -1,0 +1,76 @@
+@page "/question-bank"
+@using QuestionEntity = EduNexus.Api.Question.Entities.Question
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Question Bank</PageTitle>
+
+<div class="page-header">
+    <h2>Question Bank <span class="screen-tag">Question · FT-03</span></h2>
+    <p class="text-muted">Ngân hàng câu hỏi trắc nghiệm — lọc theo module/độ khó.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body d-flex gap-2 align-items-end flex-wrap">
+        <div style="min-width:220px">
+            <label class="form-label">Lọc theo module</label>
+            <select class="form-select" @onchange="OnFilterChanged">
+                <option value="">Tất cả</option>
+                @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+            </select>
+        </div>
+        <div style="min-width:220px">
+            <label class="form-label">Tìm kiếm nội dung</label>
+            <input class="form-control" @bind="keyword" @bind:event="oninput" @bind:after="Reload" />
+        </div>
+    </div>
+</div>
+
+@if (questions is null) { <p>Đang tải...</p> }
+else
+{
+    <table class="table table-striped">
+        <thead><tr><th>Nội dung</th><th>Độ khó</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var q in questions)
+            {
+                <tr>
+                    <td>@q.Content</td>
+                    <td><span class="badge bg-info">@q.Difficulty</span></td>
+                    <td>@q.Status</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="@($"question-detail?id={q.Id}")">Chi tiết</a></td>
+                </tr>
+            }
+            @if (questions.Count == 0) { <tr><td colspan="4" class="text-muted">Không có câu hỏi.</td></tr> }
+        </tbody>
+    </table>
+    <a class="btn btn-primary" href="question-detail">+ Thêm câu hỏi mới</a>
+}
+
+@code {
+    private List<Module>? modules;
+    private List<QuestionEntity>? questions;
+    private Guid? filterModule;
+    private string keyword = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+        await Reload();
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        filterModule = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var query = db.Questions.AsQueryable();
+        if (filterModule is not null) query = query.Where(q => q.ModuleId == filterModule);
+        if (!string.IsNullOrWhiteSpace(keyword)) query = query.Where(q => q.Content.Contains(keyword));
+        questions = await query.OrderByDescending(q => q.CreatedAt).ToListAsync();
+    }
+}

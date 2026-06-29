@@ -1,0 +1,77 @@
+@page "/ai-question-staging"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>AI Question Staging</PageTitle>
+
+<div class="page-header">
+    <h2>AI Question Staging <span class="screen-tag">Question · BR-07</span></h2>
+    <p class="text-muted">AI gợi ý câu hỏi vào khu vực chờ duyệt — SME phê duyệt trước khi vào ngân hàng.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <label class="form-label">Văn bản nguồn</label>
+        <textarea class="form-control mb-2" rows="3" @bind="source"></textarea>
+        <button class="btn btn-primary" @onclick="Generate"><span class="bi bi-robot"></span> Gợi ý câu hỏi (demo)</button>
+    </div>
+</div>
+
+<h6>Khu vực chờ duyệt</h6>
+@if (drafts is null) { <p>Đang tải...</p> }
+else
+{
+    <table class="table">
+        <thead><tr><th>Câu hỏi sinh ra (JSON)</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var d in drafts)
+            {
+                <tr>
+                    <td style="max-width:520px">@d.GeneratedJson</td>
+                    <td><span class="badge bg-@(d.Status=="Approved"?"success":"warning")">@d.Status</span></td>
+                    <td>@if (d.Status == "Pending") { <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button> }</td>
+                </tr>
+            }
+            @if (drafts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bản nháp.</td></tr> }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string source = "";
+    private List<AiQuestionDraft>? drafts;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        drafts = await db.AiQuestionDrafts.OrderByDescending(d => d.CreatedAt).ToListAsync();
+    }
+
+    private async Task Generate()
+    {
+        if (string.IsNullOrWhiteSpace(source)) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
+        db.AiQuestionDrafts.Add(new AiQuestionDraft
+        {
+            Id = Guid.NewGuid(),
+            CreatedById = anyUser ?? Guid.Empty,
+            SourceText = source,
+            GeneratedJson = "[{\"q\":\"Câu hỏi demo từ AI?\",\"options\":[\"A\",\"B\",\"C\",\"D\"],\"answer\":0}]",
+            Status = "Pending",
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        source = "";
+        await Load();
+    }
+
+    private async Task Approve(Guid id)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var d = await db.AiQuestionDrafts.FindAsync(id);
+        if (d is not null) { d.Status = "Approved"; await db.SaveChangesAsync(); }
+        await Load();
+    }
+}

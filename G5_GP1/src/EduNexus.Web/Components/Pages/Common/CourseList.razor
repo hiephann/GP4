@@ -1,0 +1,70 @@
+@page "/courses"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Course List</PageTitle>
+
+<div class="page-header">
+    <h2>Course List <span class="screen-tag">Common · FT-01</span></h2>
+    <p class="text-muted">Danh sách các khóa học SME phụ trách.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body d-flex gap-2 align-items-end flex-wrap">
+        <div>
+            <label class="form-label">Tên khóa học mới</label>
+            <input class="form-control" @bind="newTitle" placeholder="VD: Lập trình C# cơ bản" />
+        </div>
+        <button class="btn btn-primary" @onclick="AddCourse">+ Thêm khóa học</button>
+    </div>
+</div>
+
+@if (courses is null)
+{
+    <p>Đang tải...</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Hiển thị</th><th>Phiên bản</th><th>Ngày tạo</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var c in courses)
+            {
+                <tr>
+                    <td>@c.Title</td>
+                    <td><span class="badge bg-secondary">@c.Status</span></td>
+                    <td>@(c.IsVisible ? "Có" : "Không")</td>
+                    <td>v@c.Version</td>
+                    <td>@c.CreatedAt.ToString("dd/MM/yyyy")</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="@($"course-structure?id={c.Id}")">Cấu trúc</a></td>
+                </tr>
+            }
+            @if (courses.Count == 0)
+            {
+                <tr><td colspan="6" class="text-muted">Chưa có khóa học nào.</td></tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Course>? courses;
+    private string newTitle = "";
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        courses = await db.Courses.OrderByDescending(c => c.CreatedAt).ToListAsync();
+    }
+
+    private async Task AddCourse()
+    {
+        if (string.IsNullOrWhiteSpace(newTitle)) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        db.Courses.Add(new Course { Id = Guid.NewGuid(), Title = newTitle.Trim(), Status = "Draft", CreatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+        newTitle = "";
+        await Load();
+    }
+}

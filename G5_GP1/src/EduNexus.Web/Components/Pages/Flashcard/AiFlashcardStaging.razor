@@ -1,0 +1,77 @@
+@page "/ai-flashcard-staging"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>AI Flashcard Staging</PageTitle>
+
+<div class="page-header">
+    <h2>AI Flashcard Staging <span class="screen-tag">Flashcard · BR-07</span></h2>
+    <p class="text-muted">AI tạo cặp thuật ngữ–định nghĩa vào khu vực chờ duyệt.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <label class="form-label">Văn bản nguồn</label>
+        <textarea class="form-control mb-2" rows="3" @bind="source" placeholder="Dán nội dung để AI tạo flashcard..."></textarea>
+        <button class="btn btn-primary" @onclick="Generate"><span class="bi bi-robot"></span> Sinh thẻ (demo)</button>
+    </div>
+</div>
+
+<h6>Khu vực chờ duyệt</h6>
+@if (drafts is null) { <p>Đang tải...</p> }
+else
+{
+    <table class="table">
+        <thead><tr><th>Nội dung sinh ra</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var d in drafts)
+            {
+                <tr>
+                    <td style="max-width:520px">@d.GeneratedJson</td>
+                    <td><span class="badge bg-@(d.Status=="Approved"?"success":"warning")">@d.Status</span></td>
+                    <td>@if (d.Status == "Pending") { <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button> }</td>
+                </tr>
+            }
+            @if (drafts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bản nháp.</td></tr> }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string source = "";
+    private List<AiFlashcardDraft>? drafts;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        drafts = await db.AiFlashcardDrafts.OrderByDescending(d => d.CreatedAt).ToListAsync();
+    }
+
+    private async Task Generate()
+    {
+        if (string.IsNullOrWhiteSpace(source)) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
+        db.AiFlashcardDrafts.Add(new AiFlashcardDraft
+        {
+            Id = Guid.NewGuid(),
+            CreatedById = anyUser ?? Guid.Empty,
+            SourceText = source,
+            GeneratedJson = "[{\"front\":\"Thuật ngữ A\",\"back\":\"Định nghĩa A\"},{\"front\":\"Thuật ngữ B\",\"back\":\"Định nghĩa B\"}]",
+            Status = "Pending",
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        source = "";
+        await Load();
+    }
+
+    private async Task Approve(Guid id)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var d = await db.AiFlashcardDrafts.FindAsync(id);
+        if (d is not null) { d.Status = "Approved"; await db.SaveChangesAsync(); }
+        await Load();
+    }
+}

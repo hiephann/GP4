@@ -1,0 +1,79 @@
+@page "/new-quiz"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>New Quiz</PageTitle>
+
+<div class="page-header">
+    <h2>New Quiz <span class="screen-tag">Quiz · FT-07</span></h2>
+    <p class="text-muted">Tự tạo bài kiểm tra luyện tập: chọn phạm vi, số câu, độ khó.</p>
+</div>
+
+<div class="card" style="max-width:560px">
+    <div class="card-body">
+        <div class="mb-2">
+            <label class="form-label">Học viên</label>
+            <select class="form-select" @bind="studentId">
+                <option value="">-- chọn --</option>
+                @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Module</label>
+            <select class="form-select" @bind="moduleId">
+                <option value="">Tất cả module</option>
+                @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+            </select>
+        </div>
+        <div class="row mb-2">
+            <div class="col">
+                <label class="form-label">Số câu</label>
+                <input type="number" class="form-control" @bind="count" min="1" />
+            </div>
+            <div class="col">
+                <label class="form-label">Độ khó</label>
+                <select class="form-select" @bind="difficulty"><option value="">Mọi độ khó</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+            </div>
+        </div>
+        <button class="btn btn-primary" @onclick="Create">Tạo & bắt đầu làm bài</button>
+        @if (message is not null) { <div class="alert alert-warning mt-2">@message</div> }
+    </div>
+</div>
+
+@code {
+    private List<User>? students;
+    private List<Module>? modules;
+    private string? studentId, moduleId, difficulty;
+    private int count = 5;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
+    }
+
+    private async Task Create()
+    {
+        if (!Guid.TryParse(studentId, out var sid)) { message = "Chọn học viên."; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+
+        var q = db.Questions.AsQueryable();
+        if (Guid.TryParse(moduleId, out var mid)) q = q.Where(x => x.ModuleId == mid);
+        if (!string.IsNullOrEmpty(difficulty)) q = q.Where(x => x.Difficulty == difficulty);
+
+        // NAC-07-a: nếu thiếu, lấy tất cả câu có sẵn
+        var picked = await q.OrderBy(x => Guid.NewGuid()).Take(count).Select(x => x.Id).ToListAsync();
+        if (picked.Count == 0) { message = "Không có câu hỏi phù hợp. Hãy tạo câu hỏi trong Question Bank trước."; return; }
+
+        var quiz = new QuizItem { Id = Guid.NewGuid(), StudentId = sid, QuestionCount = picked.Count, Difficulty = difficulty, CreatedAt = DateTime.UtcNow };
+        db.Quizzes.Add(quiz);
+        int i = 0;
+        foreach (var qid in picked)
+            db.QuizQuestions.Add(new QuizQuestion { Id = Guid.NewGuid(), QuizId = quiz.Id, QuestionId = qid, OrderIndex = i++ });
+        await db.SaveChangesAsync();
+
+        Nav.NavigateTo($"quiz-taking?id={quiz.Id}");
+    }
+}

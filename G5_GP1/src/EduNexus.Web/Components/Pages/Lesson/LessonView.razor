@@ -1,0 +1,70 @@
+@page "/lesson-view"
+@using LessonEntity = EduNexus.Api.Lesson.Entities.Lesson
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+
+<PageTitle>Lesson View</PageTitle>
+
+<div class="page-header">
+    <h2>Lesson View <span class="screen-tag">Lesson · FT-06</span></h2>
+    <p class="text-muted">Xem modules và nội dung lesson.</p>
+</div>
+
+<div class="mb-3" style="max-width:480px">
+    <label class="form-label">Chọn bài học</label>
+    <select class="form-select" @onchange="OnLessonChanged">
+        <option value="">-- chọn --</option>
+        @if (lessons is not null)
+        {
+            @foreach (var l in lessons) { <option value="@l.Id">@l.Title</option> }
+        }
+    </select>
+</div>
+
+@if (current is not null)
+{
+    <h4>@current.Title</h4>
+    @foreach (var c in contents!)
+    {
+        <div class="card mb-2">
+            <div class="card-body">
+                @if (c.ContentType == "Markdown")
+                {
+                    <pre style="white-space:pre-wrap">@c.MarkdownText</pre>
+                }
+                else if (c.ContentType == "YoutubeVideo")
+                {
+                    <a href="@c.YoutubeUrl" target="_blank">@c.YoutubeUrl</a>
+                    @if (!string.IsNullOrEmpty(c.VideoSummary))
+                    {
+                        <div class="alert alert-light mt-2"><strong>Tóm tắt AI:</strong> @c.VideoSummary</div>
+                    }
+                }
+                else
+                {
+                    <span class="bi bi-paperclip"></span> @c.FileName
+                }
+            </div>
+        </div>
+    }
+    @if (contents!.Count == 0) { <p class="text-muted">Bài học chưa có nội dung.</p> }
+}
+
+@code {
+    private List<LessonEntity>? lessons;
+    private LessonEntity? current;
+    private List<LessonContent>? contents;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        lessons = await db.Lessons.OrderBy(l => l.Title).ToListAsync();
+    }
+
+    private async Task OnLessonChanged(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { current = null; return; }
+        using var db = await DbFactory.CreateDbContextAsync();
+        current = await db.Lessons.FindAsync(id);
+        contents = await db.LessonContents.Where(c => c.LessonId == id).OrderBy(c => c.OrderIndex).ToListAsync();
+    }
+}

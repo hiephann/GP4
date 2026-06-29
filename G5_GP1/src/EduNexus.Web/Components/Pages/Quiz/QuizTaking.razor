@@ -1,0 +1,93 @@
+@page "/quiz-taking"
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Quiz Taking</PageTitle>
+
+<div class="page-header">
+    <h2>Quiz Taking <span class="screen-tag">Quiz · FT-07</span></h2>
+    <p class="text-muted">Chọn đáp án và nộp bài. Không hiển thị đáp án đúng khi đang làm.</p>
+</div>
+
+@if (Id is null)
+{
+    <div class="alert alert-info">Hãy tạo bài kiểm tra ở <a href="new-quiz">New Quiz</a>.</div>
+}
+else if (items is null)
+{
+    <p>Đang tải...</p>
+}
+else
+{
+    @foreach (var (q, idx) in items.Select((q, i) => (q, i)))
+    {
+        <div class="card mb-2">
+            <div class="card-body">
+                <p class="fw-bold">Câu @(idx + 1): @q.Content</p>
+                @foreach (var o in q.Options)
+                {
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="@q.Id" id="@o.Id"
+                               checked="@(answers.GetValueOrDefault(q.Id) == o.Id)"
+                               @onchange="() => answers[q.Id] = o.Id" />
+                        <label class="form-check-label" for="@o.Id">@o.Content</label>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    <button class="btn btn-primary" @onclick="SubmitQuiz">Nộp bài</button>
+}
+
+@code {
+    record QView(Guid Id, string Content, List<QuestionOption> Options);
+
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery]
+    [Microsoft.AspNetCore.Components.Parameter] public Guid? Id { get; set; }
+
+    private List<QView>? items;
+    private QuizItem? quiz;
+    private Dictionary<Guid, Guid> answers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        quiz = await db.Quizzes.FindAsync(Id);
+        var qids = await db.QuizQuestions.Where(x => x.QuizId == Id).OrderBy(x => x.OrderIndex).Select(x => x.QuestionId).ToListAsync();
+        items = new();
+        foreach (var qid in qids)
+        {
+            var q = await db.Questions.FindAsync(qid);
+            if (q is null) continue;
+            var opts = await db.QuestionOptions.Where(o => o.QuestionId == qid).OrderBy(o => o.OrderIndex).ToListAsync();
+            items.Add(new QView(q.Id, q.Content, opts));
+        }
+    }
+
+    private async Task SubmitQuiz()
+    {
+        if (quiz is null || items is null) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var attempt = new QuizAttempt { Id = Guid.NewGuid(), QuizId = quiz.Id, StudentId = quiz.StudentId, StartedAt = DateTime.UtcNow };
+
+        int correct = 0;
+        foreach (var q in items)
+        {
+            var selected = answers.GetValueOrDefault(q.Id);
+            bool isCorrect = q.Options.Any(o => o.Id == selected && o.IsCorrect);
+            if (isCorrect) correct++;
+            db.QuizAttemptAnswers.Add(new QuizAttemptAnswer
+            {
+                Id = Guid.NewGuid(), AttemptId = attempt.Id, QuestionId = q.Id,
+                SelectedOptionId = selected == Guid.Empty ? null : selected, IsCorrect = isCorrect
+            });
+        }
+        attempt.SubmittedAt = DateTime.UtcNow;
+        attempt.Score = items.Count == 0 ? 0 : Math.Round(correct * 10m / items.Count, 2);
+        db.QuizAttempts.Add(attempt);
+        await db.SaveChangesAsync();
+
+        Nav.NavigateTo($"quiz-results?id={attempt.Id}");
+    }
+}
