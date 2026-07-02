@@ -1,31 +1,71 @@
 @page "/assignment-submit"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Assignment Submit</PageTitle>
+<PageTitle>Assignment Submit - Nộp Bài</PageTitle>
 
-<div class="page-header">
-    <h2>Assignment Submit <span class="screen-tag">Assignment · FT-08</span></h2>
-    <p class="text-muted">Nộp bài; AI tự động đánh giá bất đồng bộ. Mỗi học viên chỉ nộp 1 lần.</p>
+<div class="page-header text-center mb-4">
+    <h2>Nộp Bài Tập <span class="screen-tag">Assignment · FT-08</span></h2>
+    <p class="text-muted">Khu vực làm bài tập trung. Hệ thống sẽ tự động gửi cho AI đánh giá sơ bộ.</p>
 </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <label class="form-label">Bài tập</label>
-        <select class="form-select mb-2" @bind="assignmentId">
-            <option value="">-- chọn --</option>
-            @if (items is not null) { @foreach (var a in items) { <option value="@a.Id">@a.Title</option> } }
-        </select>
-        <label class="form-label">Học viên</label>
-        <select class="form-select mb-2" @bind="studentId">
-            <option value="">-- chọn --</option>
-            @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
-        </select>
-    </div>
-    <div class="col-md-8">
-        <label class="form-label">Bài làm (tối đa 20.000 ký tự)</label>
-        <textarea class="form-control mb-2" rows="8" maxlength="20000" @bind="content"></textarea>
-        <button class="btn btn-primary" @onclick="Submit">Nộp bài</button>
-        @if (message is not null) { <div class="alert @(ok?"alert-success":"alert-danger") mt-2">@message</div> }
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="lms-card p-4 mb-4">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-muted small text-uppercase">Bài tập</label>
+                    <select class="form-select lms-input" @bind="assignmentId">
+                        <option value="">-- Chọn bài tập --</option>
+                        @if (items is not null) { @foreach (var a in items) { <option value="@a.Id">@a.Title</option> } }
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold text-muted small text-uppercase">Học viên (Mô phỏng login)</label>
+                    <select class="form-select lms-input" @bind="studentId">
+                        <option value="">-- Chọn học viên --</option>
+                        @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="lms-card p-4">
+            <div class="d-flex justify-content-between align-items-end mb-2">
+                <label class="form-label fw-bold fs-5 mb-0"><i class="bi bi-journal-text text-primary me-2"></i>Bài Làm Của Bạn</label>
+                <span class="small fw-bold @(content.Length > 20000 ? "text-danger" : "text-muted")">
+                    @content.Length / 20,000 ký tự
+                </span>
+            </div>
+            
+            <textarea class="form-control lms-focus-textarea mb-4" rows="15" maxlength="20000" 
+                      placeholder="Nhập nội dung bài làm của bạn tại đây..." 
+                      @bind="content" @bind:event="oninput"></textarea>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i> Không nộp quá 1 lần (NAC-08-b).
+                </div>
+                <button class="btn lms-btn-primary btn-lg px-5" @onclick="Submit" disabled="@isSubmitting">
+                    @if(isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Đang nộp...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-send-check me-2"></i><span>Nộp Bài</span>
+                    }
+                </button>
+            </div>
+
+            @if (message is not null) 
+            { 
+                <div class="alert @(ok ? "alert-success" : "alert-danger") mt-4 d-flex align-items-center">
+                    <i class="bi @(ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") fs-4 me-3"></i>
+                    <div>@message</div>
+                </div> 
+            }
+        </div>
     </div>
 </div>
 
@@ -36,6 +76,7 @@
     private string content = "";
     private string? message;
     private bool ok;
+    private bool isSubmitting = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -47,12 +88,22 @@
     private async Task Submit()
     {
         if (!Guid.TryParse(assignmentId, out var aid) || !Guid.TryParse(studentId, out var sid))
-        { ok = false; message = "Chọn bài tập và học viên."; return; }
+        { ok = false; message = "Vui lòng chọn bài tập và học viên trước khi nộp."; return; }
         if (string.IsNullOrWhiteSpace(content)) { ok = false; message = "Bài nộp rỗng bị từ chối (NAC-08-d)."; return; }
+
+        isSubmitting = true;
+        StateHasChanged();
+        
+        // Mô phỏng network delay
+        await Task.Delay(800);
 
         using var db = await DbFactory.CreateDbContextAsync();
         if (await db.Submissions.AnyAsync(s => s.AssignmentId == aid && s.StudentId == sid))
-        { ok = false; message = "Đã nộp rồi — không nộp lần 2 (NAC-08-b)."; return; }
+        { 
+            ok = false; message = "Bạn đã nộp bài tập này rồi — không thể nộp lần 2 (NAC-08-b)."; 
+            isSubmitting = false;
+            return; 
+        }
 
         db.Submissions.Add(new Submission
         {
@@ -65,6 +116,8 @@
         });
         await db.SaveChangesAsync();
         content = "";
-        ok = true; message = "Nộp bài thành công. Hệ thống sẽ chấm sơ bộ bằng AI (bất đồng bộ).";
+        ok = true; 
+        message = "Nộp bài thành công! Hệ thống đã ghi nhận và AI đang tiến hành chấm điểm sơ bộ.";
+        isSubmitting = false;
     }
 }

@@ -1,45 +1,104 @@
 @page "/assignment-result"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Assignment Result</PageTitle>
+<PageTitle>Assignment Result - Kết Quả</PageTitle>
 
-<div class="page-header">
-    <h2>Assignment Result <span class="screen-tag">Assignment · FT-08</span></h2>
-    <p class="text-muted">Xem kết quả đánh giá (điểm, feedback, chi tiết theo rubric).</p>
-</div>
-
-<div class="mb-3" style="max-width:560px">
-    <label class="form-label">Chọn bài nộp</label>
-    <select class="form-select" @onchange="OnChanged">
-        <option value="">-- chọn --</option>
-        @if (submissions is not null)
-        {
-            @foreach (var s in submissions) { <option value="@s.Id">@s.Label</option> }
-        }
-    </select>
+<div class="page-header d-flex justify-content-between align-items-end mb-4">
+    <div>
+        <h2>Kết Quả Bài Tập <span class="screen-tag">Assignment · FT-08</span></h2>
+        <p class="text-muted mb-0">Xem chi tiết đánh giá từ AI và phản hồi của Giáo viên.</p>
+    </div>
+    <div style="min-width: 350px;">
+        <select class="form-select lms-input" @onchange="OnChanged">
+            <option value="">-- Chọn bài nộp để xem kết quả --</option>
+            @if (submissions is not null)
+            {
+                @foreach (var s in submissions) { <option value="@s.Id">@s.Label</option> }
+            }
+        </select>
+    </div>
 </div>
 
 @if (current is not null)
 {
-    <div class="card">
-        <div class="card-body">
-            <p><strong>Trạng thái:</strong> <span class="badge bg-secondary">@current.Status</span></p>
-            <p><strong>Điểm cuối:</strong> @(current.FinalScore?.ToString() ?? "Chưa có (chờ GV xác nhận — BR-10)")</p>
-            <p><strong>Nhận xét GV:</strong> @(current.TeacherComment ?? "-")</p>
-            <hr />
-            <h6>Bài làm</h6>
-            <pre style="white-space:pre-wrap">@current.ContentText</pre>
-
-            @if (current.Status != "Confirmed")
-            {
-                <div class="alert alert-warning">Mô phỏng: GV xác nhận điểm cuối cùng.</div>
-                <div class="input-group" style="max-width:360px">
-                    <input type="number" class="form-control" @bind="scoreInput" placeholder="Điểm" />
-                    <input class="form-control" @bind="commentInput" placeholder="Nhận xét" />
-                    <button class="btn btn-success" @onclick="Confirm">Xác nhận</button>
+    <div class="row g-4">
+        <!-- Cột Trái: Điểm số & Trạng thái -->
+        <div class="col-lg-4">
+            <div class="lms-card p-4 text-center mb-4">
+                <h5 class="fw-bold mb-4 text-muted small text-uppercase">Điểm Tổng Kết</h5>
+                
+                @if(current.FinalScore.HasValue)
+                {
+                    <div class="lms-score-circle mb-3 mx-auto">
+                        @current.FinalScore.Value.ToString("0.#")
+                    </div>
+                    <span class="lms-badge lms-badge-success mb-2">Đã Chốt Điểm</span>
+                }
+                else
+                {
+                    <div class="lms-score-circle mb-3 mx-auto text-muted border-secondary">
+                        ?
+                    </div>
+                    <span class="lms-badge lms-badge-warning mb-2">Đang Chờ GV Xác Nhận</span>
+                }
+                
+                <div class="mt-4 pt-3 border-top text-start">
+                    <p class="mb-1 text-muted small fw-bold text-uppercase">Trạng thái bài nộp</p>
+                    <p class="fw-bold">@current.Status</p>
                 </div>
-            }
+            </div>
+
+            <!-- Khung Nhận xét GV -->
+            <div class="lms-card p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-chat-quote text-primary me-2"></i>Nhận Xét Của GV</h5>
+                @if(!string.IsNullOrEmpty(current.TeacherComment))
+                {
+                    <div class="p-3 bg-light rounded-3 border-start border-4 border-primary fst-italic">
+                        "@current.TeacherComment"
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted fst-italic mb-0">Chưa có nhận xét nào.</p>
+                }
+                
+                @if (current.Status != "Confirmed")
+                {
+                    <div class="mt-4 pt-3 border-top">
+                        <div class="alert alert-warning py-2 small mb-3">
+                            <i class="bi bi-person-badge"></i> <b>Khu vực Giáo viên:</b> Chốt điểm cuối cùng.
+                        </div>
+                        <label class="form-label small fw-bold">Điểm số</label>
+                        <input type="number" class="form-control lms-input mb-2" @bind="scoreInput" placeholder="Nhập điểm..." />
+                        
+                        <label class="form-label small fw-bold">Nhận xét</label>
+                        <textarea class="form-control lms-input mb-3" @bind="commentInput" rows="2" placeholder="Nhập nhận xét của bạn..."></textarea>
+                        
+                        <button class="btn lms-btn-primary w-100" @onclick="Confirm">
+                            <i class="bi bi-check2-circle me-1"></i> Xác Nhận Điểm
+                        </button>
+                    </div>
+                }
+            </div>
         </div>
+
+        <!-- Cột Phải: Nội dung bài làm -->
+        <div class="col-lg-8">
+            <div class="lms-card p-4 h-100">
+                <h5 class="fw-bold mb-4"><i class="bi bi-journal-text text-primary me-2"></i>Nội Dung Bài Làm</h5>
+                <div class="bg-light p-4 rounded-3 border" style="min-height: 400px;">
+                    <pre style="white-space:pre-wrap; font-family: inherit;">@current.ContentText</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="lms-card p-5 text-center text-muted mt-4">
+        <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+        <h4>Chưa có bài nộp nào được chọn.</h4>
+        <p>Vui lòng chọn một bài nộp từ danh sách phía trên để xem kết quả đánh giá.</p>
     </div>
 }
 
