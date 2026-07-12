@@ -1,108 +1,175 @@
 @page "/login"
-@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@using EduNexus.Api.Common.Entities
+@using EduNexus.Web.Services
+@inject UserSession Session
+@inject NavigationManager NavManager
 
-<PageTitle>User Login</PageTitle>
+<PageTitle>Đăng nhập hệ thống — EduNexus G5</PageTitle>
 
-<div class="page-header">
-    <h2>User Login <span class="screen-tag">Common · FT-14</span></h2>
-    <p class="text-muted">Đăng nhập bằng email (kiểm tra trong bảng Users) hoặc Google Login.</p>
-</div>
-
-<div class="row">
-    <div class="col-md-5">
-        <div class="card">
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Email</label>
-                    <input class="form-control lms-input" @bind="email" placeholder="student@edunexus.vn" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Mật khẩu</label>
-                    <input type="password" class="form-control lms-input" @bind="password" />
-                </div>
-                <button class="btn lms-btn-primary" @onclick="DoLogin">Đăng nhập</button>
-                <button class="btn btn-outline-danger ms-2" @onclick="GoogleLogin">
-                    <span class="bi bi-google"></span> Google Login
-                </button>
+<div class="row g-0" style="min-height: 100vh;">
+    <!-- Cột trái: Hình ảnh/Branding -->
+    <div class="col-md-6 d-none d-md-flex flex-column justify-content-center align-items-center text-white position-relative overflow-hidden" 
+         style="background: var(--lms-primary-gradient);">
+        
+        <!-- Các vòng tròn trang trí -->
+        <div class="position-absolute" style="width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%; top: -50px; left: -50px;"></div>
+        <div class="position-absolute" style="width: 400px; height: 400px; background: rgba(255,255,255,0.05); border-radius: 50%; bottom: -100px; right: -100px;"></div>
+        
+        <div class="text-center z-1 px-5">
+            <div class="d-inline-flex align-items-center justify-content-center bg-white rounded-circle mb-4 shadow" 
+                 style="width: 80px; height: 80px; color: var(--lms-primary); font-size: 2.5rem;">
+                <i class="bi bi-mortarboard-fill"></i>
             </div>
+            <h1 class="display-5 fw-bold mb-3">EduNexus LMS</h1>
+            <p class="lead" style="opacity: 0.9;">Hệ thống Quản lý Học tập Toàn diện. Trải nghiệm giáo dục thế hệ mới với tích hợp AI.</p>
         </div>
-
-        @if (message is not null)
-        {
-            <div class="alert @(success ? "alert-success" : "alert-danger") mt-3">@message</div>
-        }
     </div>
 
-    <div class="col-md-7">
-        <h6 class="text-muted">Tài khoản trong hệ thống</h6>
-        @if (users is null)
-        {
-            <p>Đang tải...</p>
-        }
-        else
-        {
-            <table class="table lms-table table-sm table-striped">
-                <thead><tr><th>Email</th><th>Tên</th><th>Provider</th><th>Active</th></tr></thead>
-                <tbody>
-                    @foreach (var u in users)
+    <!-- Cột phải: Form đăng nhập -->
+    <div class="col-md-6 d-flex justify-content-center align-items-center bg-white">
+        <div class="w-100" style="max-width: 420px; padding: 2rem;">
+            <div class="mb-5 text-center">
+                <h3 class="fw-bold text-dark">Chào mừng trở lại!</h3>
+                <p class="text-muted">Vui lòng đăng nhập để tiếp tục</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger py-2 small">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMessage
+                </div>
+            }
+
+            <!-- Form Đăng nhập Truyền thống -->
+            <form @onsubmit="HandleLogin">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
+                        <input type="email" class="form-control border-start-0 ps-0" @bind="email" required placeholder="name@domain.com">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between">
+                        <label class="form-label fw-bold small text-dark">Mật khẩu</label>
+                        <a href="#" class="small text-decoration-none" style="color: var(--lms-primary);">Quên mật khẩu?</a>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
+                        <input type="password" class="form-control border-start-0 ps-0" @bind="password" required placeholder="••••••••">
+                    </div>
+                </div>
+
+                <div class="mb-4 form-check">
+                    <input type="checkbox" class="form-check-input" id="rememberMe">
+                    <label class="form-check-label small text-muted" for="rememberMe">Ghi nhớ đăng nhập</label>
+                </div>
+
+                <button type="submit" class="btn lms-btn-primary w-100 mb-3 py-2 fw-bold" disabled="@isLoading">
+                    @if (isLoading)
                     {
-                        <tr>
-                            <td>@u.Email</td><td>@u.DisplayName</td><td>@u.AuthProvider</td>
-                            <td>@(u.IsActive ? "Có" : "Không")</td>
-                        </tr>
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Đang đăng nhập...</span>
                     }
-                    @if (users.Count == 0)
+                    else
                     {
-                        <tr><td colspan="4" class="text-muted">Chưa có user. Bấm nút bên dưới để tạo tài khoản demo.</td></tr>
+                        <span>Đăng nhập</span>
                     }
-                </tbody>
-            </table>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="CreateDemoUser">+ Tạo user demo</button>
-        }
+                </button>
+            </form>
+
+            <div class="d-flex align-items-center my-4">
+                <hr class="flex-grow-1 text-muted">
+                <span class="px-3 text-muted small fw-bold">HOẶC</span>
+                <hr class="flex-grow-1 text-muted">
+            </div>
+
+            <!-- Nút Google Login -->
+            <button class="btn btn-outline-dark w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2 mb-4" 
+                    @onclick="HandleGoogleLogin" disabled="@isLoading">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-google" viewBox="0 0 16 16">
+                  <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352 2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z"/>
+                </svg>
+                Tiếp tục với Google
+            </button>
+
+            <div class="text-center small text-muted">
+                Chưa có tài khoản? <a href="#" class="text-decoration-none fw-bold" style="color: var(--lms-primary);">Đăng ký ngay</a>
+            </div>
+
+            <!-- Nút Quick Fill cho Giảng viên chấm điểm -->
+            <div class="mt-5 p-3 rounded" style="background: var(--lms-surface); border: 1px dashed var(--lms-border);">
+                <p class="small text-muted mb-2 text-center fw-bold"><i class="bi bi-magic me-1"></i> Trình chấm điểm (Demo Quick Fill)</p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <button class="btn btn-sm btn-outline-secondary" style="font-size: 0.75rem;" @onclick="@(() => FillForm("admin@edunexus.vn", "admin123"))">Admin</button>
+                    <button class="btn btn-sm btn-outline-primary" style="font-size: 0.75rem;" @onclick="@(() => FillForm("sme.nguyen@edunexus.vn", "sme123"))">SME</button>
+                    <button class="btn btn-sm btn-outline-success" style="font-size: 0.75rem;" @onclick="@(() => FillForm("student.le@edunexus.vn", "student123"))">Student (Lê)</button>
+                </div>
+            </div>
+
+        </div>
     </div>
 </div>
 
 @code {
     private string email = "";
     private string password = "";
-    private string? message;
-    private bool success;
-    private List<User>? users;
+    private string errorMessage = "";
+    private bool isLoading = false;
 
-    protected override async Task OnInitializedAsync() => await LoadUsers();
-
-    private async Task LoadUsers()
+    private void FillForm(string e, string p)
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        users = await db.Users.OrderBy(u => u.Email).ToListAsync();
+        email = e;
+        password = p;
+        errorMessage = "";
     }
 
-    private async Task DoLogin()
+    private async Task HandleLogin()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
-        if (user is null) { success = false; message = "Email không tồn tại."; }
-        else if (!user.IsActive) { success = false; message = "Tài khoản bị vô hiệu hóa."; }
-        else { success = true; message = $"Đăng nhập thành công: {user.DisplayName}"; }
-    }
-
-    private void GoogleLogin() { success = true; message = "Demo: luồng Google OAuth (BR-26 tự liên kết tài khoản)."; }
-
-    private async Task CreateDemoUser()
-    {
-        using var db = await DbFactory.CreateDbContextAsync();
-        var n = await db.Users.CountAsync() + 1;
-        db.Users.Add(new User
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            Id = Guid.NewGuid(),
-            Email = $"student{n}@edunexus.vn",
-            DisplayName = $"Học viên {n}",
-            AuthProvider = "Local",
-            IsEmailVerified = true,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
-        await LoadUsers();
+            errorMessage = "Vui lòng nhập đầy đủ Email và Mật khẩu.";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = "";
+        
+        // Gọi Auth Service
+        bool success = await Session.LoginWithEmailAsync(email, password);
+        
+        if (success)
+        {
+            // Reset layout to normal if we were rendering without MainLayout
+            // Note: Since we are inside MainLayout by default in Blazor Web App, 
+            // the layout is already there. We just navigate.
+            NavManager.NavigateTo("/dashboard");
+        }
+        else
+        {
+            errorMessage = "Email hoặc Mật khẩu không chính xác.";
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleGoogleLogin()
+    {
+        isLoading = true;
+        errorMessage = "";
+
+        // Mô phỏng luồng đăng nhập Google: Auto select Student Lê Thị Bình cho demo
+        await Task.Delay(800); // Giả lập mạng
+        bool success = await Session.LoginWithGoogleAsync("student.le@edunexus.vn");
+        
+        if (success)
+        {
+            NavManager.NavigateTo("/dashboard");
+        }
+        else
+        {
+            errorMessage = "Xác thực Google thất bại.";
+            isLoading = false;
+        }
     }
 }

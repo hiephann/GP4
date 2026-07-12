@@ -20,16 +20,32 @@
                     </span>
                 </div>
                 
-                <div class="d-flex align-items-center gap-2" style="cursor: pointer;">
-                    <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle" 
-                         style="width: 36px; height: 36px; background: var(--lms-primary-gradient); color: white; font-size: 0.9rem;">
-                        HV
-                    </div>
-                    <div class="d-none d-md-block">
-                        <div class="fw-bold" style="font-size: 0.85rem; line-height: 1.2;">Học Viên</div>
-                        <div class="text-muted" style="font-size: 0.75rem;">Student Role</div>
-                    </div>
-                    <i class="bi bi-chevron-down text-muted small ms-1"></i>
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;" @onclick="Logout">
+                    @if (Session.IsLoggedIn)
+                    {
+                        var u = Session.CurrentUser!;
+                        var initials = string.IsNullOrWhiteSpace(u.DisplayName) ? "U" : u.DisplayName.Substring(0, 1).ToUpper();
+                        <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle" 
+                             style="width: 36px; height: 36px; background: var(--lms-primary-gradient); color: white; font-size: 0.9rem;">
+                            @initials
+                        </div>
+                        <div class="d-none d-md-block text-start">
+                            <div class="fw-bold text-dark" style="font-size: 0.85rem; line-height: 1.2;">@u.DisplayName</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">@(Session.CurrentRole?.Name ?? "User")</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle" 
+                             style="width: 36px; height: 36px; background: #e0e0e0; color: #777; font-size: 0.9rem;">
+                            ?
+                        </div>
+                        <div class="d-none d-md-block text-start">
+                            <div class="fw-bold text-dark" style="font-size: 0.85rem; line-height: 1.2;">Chưa đăng nhập</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Khách</div>
+                        </div>
+                    }
+                    <i class="bi bi-box-arrow-right text-muted small ms-2" title="Đăng xuất"></i>
                 </div>
             </div>
         </header>
@@ -45,3 +61,29 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    [Inject] EduNexus.Web.Services.UserSession Session { get; set; } = default!;
+    [Inject] NavigationManager Nav { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Session.InitializeAsync();
+            Session.OnChange += StateHasChanged;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
+    }
+
+    private async Task Logout()
+    {
+        await Session.LogoutAsync();
+        Nav.NavigateTo("/login");
+    }
+}

@@ -1,70 +1,118 @@
 @page "/courses"
+@using EduNexus.Api.Common.Entities
+@using EduNexus.Web.Services
+@inject UserSession Session
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Course List</PageTitle>
+<PageTitle>Course List — SME</PageTitle>
 
-<div class="page-header">
-    <h2>Course List <span class="screen-tag">Common · FT-01</span></h2>
-    <p class="text-muted">Danh sách các khóa học SME phụ trách.</p>
-</div>
-
-<div class="card mb-3">
-    <div class="card-body d-flex gap-2 align-items-end flex-wrap">
+<div class="page-header mb-4">
+    <div class="d-flex justify-content-between align-items-center">
         <div>
-            <label class="form-label">Tên khóa học mới</label>
-            <input class="form-control lms-input" @bind="newTitle" placeholder="VD: Lập trình C# cơ bản" />
+            <h2>Quản lý Khóa học <span class="screen-tag">Common · SME</span></h2>
+            <p class="text-muted">Danh sách các courses mà bạn phụ trách.</p>
         </div>
-        <button class="btn lms-btn-primary" @onclick="AddCourse">+ Thêm khóa học</button>
+        <button class="btn lms-btn-primary"><i class="bi bi-plus-lg me-1"></i> Tạo khóa học</button>
     </div>
 </div>
 
-@if (courses is null)
+@if (!Session.IsLoggedIn)
 {
-    <p>Đang tải...</p>
+    <div class="alert alert-warning">Vui lòng đăng nhập để xem danh sách.</div>
+}
+else if (Session.CurrentRole?.Name != "SME" && Session.CurrentRole?.Name != "Admin")
+{
+    <div class="alert alert-danger">Màn hình này dành riêng cho chuyên gia nội dung (SME). Tài khoản của bạn là @Session.CurrentRole?.Name.</div>
+}
+else if (courses == null)
+{
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
 }
 else
 {
-    <table class="table lms-table table-striped">
-        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Hiển thị</th><th>Phiên bản</th><th>Ngày tạo</th><th></th></tr></thead>
-        <tbody>
+    <div class="row g-4">
+        @if (!courses.Any())
+        {
+            <div class="col-12">
+                <div class="lms-card p-5 text-center text-muted">
+                    <i class="bi bi-folder2-open display-4 mb-3"></i>
+                    <h5>Chưa có khóa học nào</h5>
+                    <p>Bạn chưa được phân công làm Owner cho bất kỳ khóa học nào.</p>
+                </div>
+            </div>
+        }
+        else
+        {
             @foreach (var c in courses)
             {
-                <tr>
-                    <td>@c.Title</td>
-                    <td><span class="badge bg-secondary">@c.Status</span></td>
-                    <td>@(c.IsVisible ? "Có" : "Không")</td>
-                    <td>v@c.Version</td>
-                    <td>@c.CreatedAt.ToString("dd/MM/yyyy")</td>
-                    <td><a class="btn btn-sm btn-outline-primary" href="@($"course-structure?id={c.Id}")">Cấu trúc</a></td>
-                </tr>
+                <div class="col-md-6 col-lg-4">
+                    <div class="lms-card h-100 d-flex flex-column">
+                        <div class="lms-section-header pb-0 border-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                            <span class="badge @(c.Status == "Published" ? "bg-success" : "bg-warning text-dark")">@c.Status</span>
+                            <span class="text-muted small">v@(c.Version)</span>
+                        </div>
+                        <div class="p-4 flex-grow-1">
+                            <h5 class="fw-bold mb-2">@c.Title</h5>
+                            <p class="text-muted small mb-0" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                @c.Description
+                            </p>
+                        </div>
+                        <div class="p-3 border-top" style="background: var(--lms-surface);">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-muted small"><i class="bi bi-calendar3"></i> @c.CreatedAt.ToString("dd/MM/yyyy")</span>
+                                <a href="/course-structure?id=@c.Id" class="btn lms-btn-secondary btn-sm">Xem cấu trúc</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             }
-            @if (courses.Count == 0)
-            {
-                <tr><td colspan="6" class="text-muted">Chưa có khóa học nào.</td></tr>
-            }
-        </tbody>
-    </table>
+        }
+    </div>
 }
 
 @code {
     private List<Course>? courses;
-    private string newTitle = "";
 
-    protected override async Task OnInitializedAsync() => await Load();
-
-    private async Task Load()
+    protected override async Task OnInitializedAsync()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        courses = await db.Courses.OrderByDescending(c => c.CreatedAt).ToListAsync();
+        Session.OnChange += StateHasChanged;
+        if (Session.IsLoggedIn) await LoadData();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Session.IsLoggedIn)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
     }
 
-    private async Task AddCourse()
+    private async Task LoadData()
     {
-        if (string.IsNullOrWhiteSpace(newTitle)) return;
+        if (Session.CurrentUser == null) return;
+        
         using var db = await DbFactory.CreateDbContextAsync();
-        db.Courses.Add(new Course { Id = Guid.NewGuid(), Title = newTitle.Trim(), Status = "Draft", CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-        newTitle = "";
-        await Load();
+        
+        if (Session.CurrentRole?.Name == "Admin")
+        {
+            courses = await db.Courses.OrderByDescending(c => c.CreatedAt).ToListAsync();
+        }
+        else 
+        {
+            courses = await db.Courses.Where(c => c.OwnerSmeId == Session.CurrentUser.Id)
+                                      .OrderByDescending(c => c.CreatedAt).ToListAsync();
+            
+            // Fallback for demo purposes if SME has no courses mapped yet
+            if(!courses.Any())
+            {
+                courses = await db.Courses.ToListAsync();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
     }
 }

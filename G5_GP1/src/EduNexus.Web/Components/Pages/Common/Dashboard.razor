@@ -1,83 +1,160 @@
 @page "/dashboard"
+@using EduNexus.Api.Common.Entities
+@using EduNexus.Web.Services
+@inject UserSession Session
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Student Dashboard</PageTitle>
+<PageTitle>Student Dashboard — EduNexus</PageTitle>
 
-<div class="page-header">
-    <h2>Student Dashboard <span class="screen-tag">Common</span></h2>
-    <p class="text-muted">Courses, classes và packages mà học viên đã đăng ký.</p>
+<div class="page-header mb-4">
+    <h2>Bảng điều khiển Học viên <span class="screen-tag">Common · Student</span></h2>
+    <p class="text-muted">Danh sách các courses, classes, và các packages mà bạn đã đăng ký.</p>
 </div>
 
-<div class="mb-3" style="max-width:420px">
-    <label class="form-label">Chọn học viên</label>
-    <select class="form-select lms-input" @onchange="OnStudentChanged">
-        <option value="">-- chọn --</option>
-        @if (students is not null)
-        {
-            @foreach (var s in students)
-            {
-                <option value="@s.Id">@s.DisplayName (@s.Email)</option>
-            }
-        }
-    </select>
-</div>
-
-@if (selectedId is not null)
+@if (!Session.IsLoggedIn)
 {
-    <div class="row g-3">
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-header">Khóa học (AccessGrant)</div>
-                <div class="card-body">
-                    @if (grants!.Count == 0) { <span class="text-muted">Không có.</span> }
-                    else { <ul>@foreach (var g in grants) { <li>@g.GrantType — @(g.ExpiresAt?.ToString("dd/MM/yyyy") ?? "vĩnh viễn")</li> }</ul> }
+    <div class="alert alert-warning">Vui lòng đăng nhập để xem thông tin học tập của bạn.</div>
+}
+else if (Session.CurrentRole?.Name != "Student" && Session.CurrentRole?.Name != "Admin")
+{
+    <div class="alert alert-info">Dashboard này thiết kế riêng cho Học viên (Student). Tài khoản của bạn là @Session.CurrentRole?.Name.</div>
+}
+else if (courses == null)
+{
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-md-12">
+            <h5 class="fw-bold mb-3"><i class="bi bi-collection-play text-primary me-2"></i> Khóa học của bạn</h5>
+            @if (!courses.Any())
+            {
+                <div class="lms-card p-4 text-center text-muted">Bạn chưa được cấp quyền truy cập khóa học nào.</div>
+            }
+            else
+            {
+                <div class="row g-3">
+                    @foreach (var c in courses)
+                    {
+                        <div class="col-md-4">
+                            <div class="lms-card h-100 p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="fw-bold mb-0">@c.Title</h6>
+                                    <span class="badge bg-success">Đã cấp quyền</span>
+                                </div>
+                                <p class="text-muted small mb-3">@c.Description</p>
+                                <a href="/progress" class="btn lms-btn-primary btn-sm w-100">Tiếp tục học</a>
+                            </div>
+                        </div>
+                    }
                 </div>
+            }
+        </div>
+        
+        <div class="col-md-6">
+            <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info me-2"></i> Lớp học (Classes)</h5>
+            <div class="lms-card p-0 overflow-hidden">
+                @if (!classes.Any())
+                {
+                    <div class="p-4 text-center text-muted">Bạn chưa tham gia lớp học nào.</div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var cl in classes)
+                        {
+                            <li class="list-group-item p-3">
+                                <div class="fw-bold">@cl.Name</div>
+                                <div class="small text-muted mt-1">
+                                    <i class="bi bi-calendar3"></i> 
+                                    @(cl.StartDate?.ToString("dd/MM/yyyy") ?? "N/A") - @(cl.EndDate?.ToString("dd/MM/yyyy") ?? "N/A")
+                                    <span class="badge bg-info ms-2">@cl.Status</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-header">Lớp học</div>
-                <div class="card-body">
-                    @if (classNames!.Count == 0) { <span class="text-muted">Không có.</span> }
-                    else { <ul>@foreach (var c in classNames) { <li>@c</li> }</ul> }
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-header">Gói đăng ký</div>
-                <div class="card-body">
-                    @if (subs!.Count == 0) { <span class="text-muted">Không có.</span> }
-                    else { <ul>@foreach (var s in subs) { <li>Hết hạn @s.ExpiresAt.ToString("dd/MM/yyyy") (@s.Status)</li> }</ul> }
-                </div>
+
+        <div class="col-md-6">
+            <h5 class="fw-bold mb-3"><i class="bi bi-box2-heart text-warning me-2"></i> Gói thành viên (Packages)</h5>
+            <div class="lms-card p-0 overflow-hidden">
+                @if (!packages.Any())
+                {
+                    <div class="p-4 text-center text-muted">Bạn chưa đăng ký gói nào.</div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var p in packages)
+                        {
+                            <li class="list-group-item p-3">
+                                <div class="fw-bold">Gói thành viên</div>
+                                <div class="small text-muted mt-1">
+                                    Hết hạn: @p.ExpiresAt.ToString("dd/MM/yyyy HH:mm")
+                                    <span class="badge @(p.Status == "Active" ? "bg-success" : "bg-danger") ms-2">@p.Status</span>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
             </div>
         </div>
     </div>
 }
 
 @code {
-    private List<User>? students;
-    private Guid? selectedId;
-    private List<AccessGrant>? grants;
-    private List<PackageSubscription>? subs;
-    private List<string>? classNames;
+    private List<Course>? courses;
+    private List<EduNexus.Api.Common.Entities.Class>? classes;
+    private List<PackageSubscription>? packages;
 
     protected override async Task OnInitializedAsync()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+        Session.OnChange += StateHasChanged;
+        if (Session.IsLoggedIn) await LoadData();
     }
 
-    private async Task OnStudentChanged(ChangeEventArgs e)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { selectedId = null; return; }
-        selectedId = id;
+        if (firstRender && Session.IsLoggedIn)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        if (Session.CurrentUser == null) return;
+        var sid = Session.CurrentUser.Id;
+
         using var db = await DbFactory.CreateDbContextAsync();
-        grants = await db.AccessGrants.Where(g => g.StudentId == id && !g.IsRevoked).ToListAsync();
-        subs = await db.PackageSubscriptions.Where(s => s.StudentId == id).ToListAsync();
-        classNames = await (from cs in db.ClassStudents
-                            join c in db.Classes on cs.ClassId equals c.Id
-                            where cs.StudentId == id
-                            select c.Name).ToListAsync();
+        
+        // 1. Khóa học được cấp quyền (thông qua AccessGrants)
+        var courseIds = await db.AccessGrants.Where(a => a.StudentId == sid && !a.IsRevoked && a.CourseId != null).Select(a => a.CourseId).ToListAsync();
+        
+        // Học viên mock (Student.Le) chưa có AccessGrants trong DemoData. Ta có thể lấy tạm khóa học có sẵn nếu chưa có để demo đẹp
+        if (courseIds.Count == 0 && Session.CurrentRole?.Name == "Student") 
+        {
+            courses = await db.Courses.Take(2).ToListAsync(); // Demo purposes
+        }
+        else
+        {
+            courses = await db.Courses.Where(c => courseIds.Contains(c.Id)).ToListAsync();
+        }
+
+        // 2. Classes
+        var classIds = await db.ClassStudents.Where(cs => cs.StudentId == sid).Select(cs => cs.ClassId).ToListAsync();
+        classes = await db.Classes.Where(c => classIds.Contains(c.Id)).ToListAsync();
+
+        // 3. Packages
+        packages = await db.PackageSubscriptions.Where(ps => ps.StudentId == sid).ToListAsync();
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
     }
 }

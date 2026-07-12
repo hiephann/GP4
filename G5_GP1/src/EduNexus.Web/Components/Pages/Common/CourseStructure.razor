@@ -1,104 +1,217 @@
 @page "/course-structure"
+@using EduNexus.Api.Common.Entities
+@using EduNexus.Api.Assignment.Entities
+@using EduNexus.Api.Flashcard.Entities
+@using EduNexus.Api.Question.Entities
+@using EduNexus.Web.Services
+@inject UserSession Session
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject NavigationManager Nav
 
-<PageTitle>Course Structure</PageTitle>
+<PageTitle>Course Structure — SME</PageTitle>
 
-<div class="page-header">
-    <h2>Course Structure <span class="screen-tag">Common · FT-01</span></h2>
-    <p class="text-muted">Module list & contents (lessons, flashcards, assignments, question bank, quizzes).</p>
-</div>
-
-<div class="mb-3" style="max-width:480px">
-    <label class="form-label">Chọn khóa học</label>
-    <select class="form-select lms-input" value="@selectedId" @onchange="OnCourseChanged">
-        <option value="">-- chọn --</option>
-        @if (courses is not null)
-        {
-            @foreach (var c in courses) { <option value="@c.Id">@c.Title</option> }
-        }
-    </select>
-</div>
-
-@if (selectedId is not null)
-{
-    <div class="d-flex gap-2 mb-3">
-        <input class="form-control lms-input" style="max-width:320px" @bind="newModuleTitle" placeholder="Tên module mới" />
-        <button class="btn lms-btn-primary" @onclick="AddModule">+ Thêm module</button>
+<div class="page-header mb-4">
+    <div class="d-flex align-items-center gap-2">
+        <a href="/courses" class="btn btn-sm btn-outline-secondary rounded-circle" style="width: 32px; height: 32px;"><i class="bi bi-arrow-left"></i></a>
+        <h2 class="mb-0">Cấu trúc Khóa học <span class="screen-tag">Common · SME</span></h2>
     </div>
+    @if(course != null)
+    {
+        <p class="text-muted mt-2 mb-0">@course.Title — Quản lý modules, bài học, bài tập, flashcard, v.v.</p>
+    }
+</div>
 
-    @if (modules!.Count == 0)
-    {
-        <p class="text-muted">Khóa học chưa có module.</p>
-    }
-    else
-    {
-        <table class="table lms-table">
-            <thead><tr><th>#</th><th>Module</th><th>Lessons</th><th>Questions</th><th>Flashcards</th><th>Assignments</th></tr></thead>
-            <tbody>
-                @foreach (var m in modules)
-                {
-                    <tr>
-                        <td>@m.OrderIndex</td>
-                        <td>@m.Title</td>
-                        <td>@counts[m.Id].l</td>
-                        <td>@counts[m.Id].q</td>
-                        <td>@counts[m.Id].f</td>
-                        <td>@counts[m.Id].a</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+@if (!Session.IsLoggedIn)
+{
+    <div class="alert alert-warning">Vui lòng đăng nhập.</div>
+}
+else if (course == null && Id.HasValue)
+{
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+}
+else if (course == null && !Id.HasValue)
+{
+    <div class="alert alert-info">Vui lòng chọn một khóa học từ <a href="/courses">Danh sách Khóa học</a>.</div>
+}
+else if (course != null)
+{
+    <div class="row g-4">
+        <!-- Cột trái: Danh sách Modules -->
+        <div class="col-md-4">
+            <div class="lms-card p-0">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center" style="background: var(--lms-surface);">
+                    <h6 class="fw-bold mb-0">Danh sách Modules</h6>
+                    <button class="btn btn-sm lms-btn-primary py-0 px-2">+</button>
+                </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var m in modules)
+                    {
+                        <button class="list-group-item list-group-item-action @(selectedModule?.Id == m.Id ? "active fw-bold" : "")"
+                                @onclick="() => SelectModule(m)">
+                            @m.Title
+                        </button>
+                    }
+                    @if(!modules.Any())
+                    {
+                        <div class="p-4 text-center text-muted small">Khóa học chưa có module nào.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột phải: Nội dung chi tiết của Module được chọn -->
+        <div class="col-md-8">
+            @if (selectedModule == null)
+            {
+                <div class="lms-card p-5 text-center text-muted h-100 d-flex flex-column justify-content-center align-items-center">
+                    <i class="bi bi-layout-text-sidebar-reverse display-4 mb-3"></i>
+                    <h5>Chọn một Module</h5>
+                    <p>Bấm vào một module bên trái để xem nội dung chi tiết (Bài học, Flashcard, Câu hỏi, Bài tập).</p>
+                </div>
+            }
+            else
+            {
+                <div class="lms-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold text-primary mb-0">@selectedModule.Title</h5>
+                        <div class="dropdown">
+                            <button class="btn btn-sm lms-btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                Thêm nội dung
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <li><a class="dropdown-item" href="#"><i class="bi bi-file-earmark-text me-2"></i> Bài học (Lesson)</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="bi bi-card-heading me-2"></i> Flashcard Group</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="bi bi-question-square me-2"></i> Câu hỏi (Question)</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#"><i class="bi bi-list-task me-2"></i> Bài tập (Assignment)</a></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Lessons -->
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi bi-book text-success me-2"></i>Bài học (@lessons.Count)</h6>
+                    <ul class="list-group mb-4">
+                        @if(!lessons.Any()) { <li class="list-group-item text-muted small">Chưa có bài học</li> }
+                        @foreach(var l in lessons)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@l.Title</span>
+                                <span class="badge bg-secondary rounded-pill">Chỉnh sửa</span>
+                            </li>
+                        }
+                    </ul>
+
+                    <!-- Flashcards -->
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi bi-stack text-warning me-2"></i>Bộ thẻ ghi nhớ (@flashcardGroups.Count)</h6>
+                    <ul class="list-group mb-4">
+                        @if(!flashcardGroups.Any()) { <li class="list-group-item text-muted small">Chưa có bộ thẻ</li> }
+                        @foreach(var fg in flashcardGroups)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@fg.Name</span>
+                                <span class="badge bg-secondary rounded-pill">Quản lý thẻ</span>
+                            </li>
+                        }
+                    </ul>
+
+                    <!-- Questions -->
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi bi-ui-checks-grid text-info me-2"></i>Ngân hàng câu hỏi (@questions.Count)</h6>
+                    <ul class="list-group mb-4">
+                        @if(!questions.Any()) { <li class="list-group-item text-muted small">Chưa có câu hỏi</li> }
+                        @foreach(var q in questions)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center text-truncate">
+                                <span class="text-truncate" style="max-width: 80%;">@q.Content</span>
+                                <span class="badge @(q.Difficulty=="Easy"?"bg-success":q.Difficulty=="Hard"?"bg-danger":"bg-warning text-dark")">@q.Difficulty</span>
+                            </li>
+                        }
+                    </ul>
+
+                    <!-- Assignments -->
+                    <h6 class="fw-bold border-bottom pb-2 mb-3"><i class="bi bi-pencil-square text-danger me-2"></i>Bài tập tự luận (@assignments.Count)</h6>
+                    <ul class="list-group mb-4">
+                        @if(!assignments.Any()) { <li class="list-group-item text-muted small">Chưa có bài tập</li> }
+                        @foreach(var a in assignments)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@a.Title</span>
+                                <span class="badge @(a.Status=="Published"?"bg-primary":"bg-secondary")">@a.Status</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @code {
-    private List<Course>? courses;
-    private Guid? selectedId;
-    private List<Module>? modules;
-    private Dictionary<Guid, (int l, int q, int f, int a)> counts = new();
-    private string newModuleTitle = "";
+    [SupplyParameterFromQuery]
+    public Guid? Id { get; set; }
 
-    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery]
-    [Microsoft.AspNetCore.Components.Parameter] public Guid? Id { get; set; }
+    private Course? course;
+    private List<Module> modules = new();
+    
+    private Module? selectedModule;
+    private List<Lesson> lessons = new();
+    private List<FlashcardGroup> flashcardGroups = new();
+    private List<Question> questions = new();
+    private List<AssignmentItem> assignments = new();
 
     protected override async Task OnInitializedAsync()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        courses = await db.Courses.OrderBy(c => c.Title).ToListAsync();
-        if (Id is not null) { selectedId = Id; await LoadModules(); }
+        Session.OnChange += StateHasChanged;
+        if (Session.IsLoggedIn) await LoadCourse();
     }
-
-    private async Task OnCourseChanged(ChangeEventArgs e)
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        selectedId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
-        await LoadModules();
-    }
-
-    private async Task LoadModules()
-    {
-        if (selectedId is null) { modules = null; return; }
-        using var db = await DbFactory.CreateDbContextAsync();
-        modules = await db.Modules.Where(m => m.CourseId == selectedId).OrderBy(m => m.OrderIndex).ToListAsync();
-        counts.Clear();
-        foreach (var m in modules)
+        if (firstRender && Session.IsLoggedIn)
         {
-            counts[m.Id] = (
-                await db.Lessons.CountAsync(x => x.ModuleId == m.Id),
-                await db.Questions.CountAsync(x => x.ModuleId == m.Id),
-                await db.Flashcards.CountAsync(x => x.ModuleId == m.Id),
-                await db.Assignments.CountAsync(x => x.ModuleId == m.Id)
-            );
+            await LoadCourse();
+            StateHasChanged();
         }
     }
 
-    private async Task AddModule()
+    private async Task LoadCourse()
     {
-        if (selectedId is null || string.IsNullOrWhiteSpace(newModuleTitle)) return;
+        if (Session.CurrentUser == null || !Id.HasValue) 
+        {
+            // If no ID passed, for demo we just pick the first one
+            if(Id == null)
+            {
+                using var db = await DbFactory.CreateDbContextAsync();
+                course = await db.Courses.FirstOrDefaultAsync();
+                if (course != null) Id = course.Id;
+            }
+            if(!Id.HasValue) return;
+        }
+
+        using var ctx = await DbFactory.CreateDbContextAsync();
+        course = await ctx.Courses.FirstOrDefaultAsync(c => c.Id == Id.Value);
+        if (course != null)
+        {
+            modules = await ctx.Modules.Where(m => m.CourseId == course.Id).OrderBy(m => m.OrderIndex).ToListAsync();
+            if (modules.Any())
+            {
+                await SelectModule(modules.First());
+            }
+        }
+    }
+
+    private async Task SelectModule(Module m)
+    {
+        selectedModule = m;
         using var db = await DbFactory.CreateDbContextAsync();
-        var order = await db.Modules.CountAsync(m => m.CourseId == selectedId) + 1;
-        db.Modules.Add(new Module { Id = Guid.NewGuid(), CourseId = selectedId.Value, Title = newModuleTitle.Trim(), OrderIndex = order, CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-        newModuleTitle = "";
-        await LoadModules();
+        
+        lessons = await db.Lessons.Where(x => x.ModuleId == m.Id).OrderBy(x => x.OrderIndex).ToListAsync();
+        flashcardGroups = await db.FlashcardGroups.Where(x => x.ModuleId == m.Id).OrderBy(x => x.OrderIndex).ToListAsync();
+        questions = await db.Questions.Where(x => x.ModuleId == m.Id).ToListAsync();
+        assignments = await db.Assignments.Where(x => x.ModuleId == m.Id).ToListAsync();
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
     }
 }

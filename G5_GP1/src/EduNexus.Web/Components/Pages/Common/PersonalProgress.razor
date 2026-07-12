@@ -1,82 +1,209 @@
 @page "/progress"
+@using EduNexus.Api.Common.Entities
+@using EduNexus.Api.Assignment.Entities
+@using EduNexus.Api.Lesson.Entities
+@using EduNexus.Api.Quiz.Entities
+@using EduNexus.Web.Services
+@inject UserSession Session
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Personal Progress</PageTitle>
+<PageTitle>Personal Progress — EduNexus</PageTitle>
 
-<div class="page-header">
-    <h2>Personal Progress <span class="screen-tag">Common · FT-12</span></h2>
-    <p class="text-muted">Tiến trình học course của học viên.</p>
+<div class="page-header mb-4">
+    <h2>Tiến trình Học tập <span class="screen-tag">Common · Student</span></h2>
+    <p class="text-muted">Chi tiết trạng thái, tiến trình học course của bạn.</p>
 </div>
 
-<div class="mb-3" style="max-width:420px">
-    <label class="form-label">Chọn học viên</label>
-    <select class="form-select lms-input" @onchange="OnStudentChanged">
-        <option value="">-- chọn --</option>
-        @if (students is not null)
-        {
-            @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> }
-        }
-    </select>
-</div>
-
-@if (selectedId is not null)
+@if (!Session.IsLoggedIn)
 {
-    <div class="row g-3">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Tiến độ bài học</div>
-                <div class="card-body">
-                    <p>Bài đã hoàn thành: <strong>@completedLessons</strong> / @totalLessons</p>
-                    <div class="progress" style="height:22px">
-                        <div class="progress-bar" style="width:@(Percent)%">@Percent%</div>
+    <div class="alert alert-warning">Vui lòng đăng nhập để xem tiến độ của bạn.</div>
+}
+else if (courses == null)
+{
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var c in courses)
+        {
+            var completion = GetCourseCompletion(c.Id);
+            
+            <div class="col-12">
+                <div class="lms-card p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0">@c.Title</h5>
+                        <span class="badge bg-primary fs-6">@completion% Hoàn thành</span>
+                    </div>
+                    
+                    <div class="progress mb-4" style="height: 12px; border-radius: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                             role="progressbar" style="width: @completion%;" 
+                             aria-valuenow="@completion" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+
+                    <div class="row g-4 mt-2">
+                        <!-- Lessons -->
+                        <div class="col-md-4">
+                            <h6 class="fw-bold text-muted border-bottom pb-2">Bài học (Lessons)</h6>
+                            <ul class="list-unstyled">
+                                @{ var courseLessons = GetLessonsForCourse(c.Id); }
+                                @foreach (var l in courseLessons)
+                                {
+                                    var isDone = lessonProgress.Any(p => p.LessonId == l.Id && p.IsCompleted);
+                                    <li class="mb-2 d-flex align-items-center gap-2">
+                                        <i class="bi @(isDone ? "bi-check-circle-fill text-success" : "bi-circle text-muted")"></i>
+                                        <span class="@(isDone ? "text-dark" : "text-muted")">@l.Title</span>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                        
+                        <!-- Quizzes -->
+                        <div class="col-md-4">
+                            <h6 class="fw-bold text-muted border-bottom pb-2">Bài kiểm tra (Quizzes)</h6>
+                            <ul class="list-unstyled">
+                                @{ var courseQuizzes = GetQuizzesForCourse(c.Id); }
+                                @if(!courseQuizzes.Any()) { <span class="text-muted small">Chưa có quiz</span> }
+                                @foreach (var qz in courseQuizzes)
+                                {
+                                    var score = quizAttempts.Where(a => a.QuizId == qz.Id).OrderByDescending(a => a.Score).FirstOrDefault()?.Score;
+                                    <li class="mb-2 d-flex justify-content-between align-items-center">
+                                        <span>@qz.Title</span>
+                                        @if(score.HasValue)
+                                        {
+                                            <span class="badge bg-info">@score / 10</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Chưa làm</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+
+                        <!-- Assignments -->
+                        <div class="col-md-4">
+                            <h6 class="fw-bold text-muted border-bottom pb-2">Bài tập tự luận (Assignments)</h6>
+                            <ul class="list-unstyled">
+                                @{ var courseAssignments = GetAssignmentsForCourse(c.Id); }
+                                @if(!courseAssignments.Any()) { <span class="text-muted small">Chưa có bài tập</span> }
+                                @foreach (var asm in courseAssignments)
+                                {
+                                    var sub = submissions.FirstOrDefault(s => s.AssignmentId == asm.Id);
+                                    <li class="mb-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="text-truncate" style="max-width: 150px;" title="@asm.Title">@asm.Title</span>
+                                            @if(sub != null)
+                                            {
+                                                <span class="badge bg-success">@sub.Status</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning text-dark">Chưa nộp</span>
+                                            }
+                                        </div>
+                                        @if(sub?.AiTotalScore != null)
+                                        {
+                                            <div class="small text-muted text-end">Điểm sơ bộ: @sub.AiTotalScore</div>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Lịch sử điểm Quiz</div>
-                <div class="card-body">
-                    @if (quizScores!.Count == 0) { <span class="text-muted">Chưa có bài quiz.</span> }
-                    else
-                    {
-                        <table class="table lms-table table-sm">
-                            <thead><tr><th>Ngày</th><th>Điểm</th></tr></thead>
-                            <tbody>
-                                @foreach (var q in quizScores)
-                                {
-                                    <tr><td>@(q.SubmittedAt?.ToString("dd/MM HH:mm"))</td><td>@q.Score</td></tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
-                </div>
-            </div>
-        </div>
+        }
     </div>
 }
 
 @code {
-    private List<User>? students;
-    private Guid? selectedId;
-    private int completedLessons, totalLessons;
-    private List<QuizAttempt>? quizScores;
-    private int Percent => totalLessons == 0 ? 0 : (int)Math.Round(completedLessons * 100.0 / totalLessons);
+    private List<Course>? courses;
+    private List<Module> modules = new();
+    private List<Lesson> allLessons = new();
+    private List<LessonProgress> lessonProgress = new();
+    
+    private List<EduNexus.Api.Quiz.Entities.QuizItem> allQuizzes = new();
+    private List<EduNexus.Api.Quiz.Entities.QuizAttempt> quizAttempts = new();
+    
+    private List<AssignmentItem> allAssignments = new();
+    private List<Submission> submissions = new();
 
     protected override async Task OnInitializedAsync()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+        Session.OnChange += StateHasChanged;
+        if (Session.IsLoggedIn) await LoadProgress();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Session.IsLoggedIn)
+        {
+            await LoadProgress();
+            StateHasChanged();
+        }
     }
 
-    private async Task OnStudentChanged(ChangeEventArgs e)
+    private async Task LoadProgress()
     {
-        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { selectedId = null; return; }
-        selectedId = id;
+        if (Session.CurrentUser == null) return;
+        var sid = Session.CurrentUser.Id;
+
         using var db = await DbFactory.CreateDbContextAsync();
-        totalLessons = await db.Lessons.CountAsync();
-        completedLessons = await db.LessonProgress.CountAsync(p => p.StudentId == id && p.IsCompleted);
-        quizScores = await db.QuizAttempts.Where(a => a.StudentId == id && a.SubmittedAt != null)
-                                          .OrderBy(a => a.SubmittedAt).ToListAsync();
+        
+        // Cố định lấy khóa học đầu tiên để làm demo nếu chưa có phân quyền chuẩn xác
+        courses = await db.Courses.ToListAsync(); 
+        
+        var courseIds = courses.Select(c => c.Id).ToList();
+        modules = await db.Modules.Where(m => courseIds.Contains(m.CourseId)).ToListAsync();
+        var modIds = modules.Select(m => m.Id).ToList();
+        
+        allLessons = await db.Lessons.Where(l => modIds.Contains(l.ModuleId)).ToListAsync();
+        lessonProgress = await db.LessonProgress.Where(p => p.StudentId == sid).ToListAsync();
+        
+        allQuizzes = await db.Quizzes.Where(q => courseIds.Contains(q.CourseId.Value)).ToListAsync();
+        quizAttempts = await db.QuizAttempts.Where(a => a.StudentId == sid).ToListAsync();
+        
+        allAssignments = await db.Assignments.Where(a => modIds.Contains(a.ModuleId)).ToListAsync();
+        submissions = await db.Submissions.Where(s => s.StudentId == sid).ToListAsync();
+        
+        // Mock Progress nếu chưa có (Demo purposes)
+        if (!lessonProgress.Any() && allLessons.Any())
+        {
+            lessonProgress.Add(new LessonProgress { LessonId = allLessons.First().Id, IsCompleted = true });
+        }
+    }
+
+    private List<Lesson> GetLessonsForCourse(Guid courseId)
+    {
+        var mods = modules.Where(m => m.CourseId == courseId).Select(m => m.Id).ToList();
+        return allLessons.Where(l => mods.Contains(l.ModuleId)).OrderBy(l => l.OrderIndex).ToList();
+    }
+    
+    private List<EduNexus.Api.Quiz.Entities.QuizItem> GetQuizzesForCourse(Guid courseId)
+    {
+        return allQuizzes.Where(q => q.CourseId == courseId).ToList();
+    }
+    
+    private List<AssignmentItem> GetAssignmentsForCourse(Guid courseId)
+    {
+        var mods = modules.Where(m => m.CourseId == courseId).Select(m => m.Id).ToList();
+        return allAssignments.Where(a => mods.Contains(a.ModuleId)).ToList();
+    }
+
+    private int GetCourseCompletion(Guid courseId)
+    {
+        var ls = GetLessonsForCourse(courseId);
+        if (!ls.Any()) return 0;
+        
+        int completed = ls.Count(l => lessonProgress.Any(p => p.LessonId == l.Id && p.IsCompleted));
+        return (int)Math.Round((double)completed / ls.Count * 100);
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
     }
 }

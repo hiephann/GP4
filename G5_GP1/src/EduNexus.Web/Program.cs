@@ -12,6 +12,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContextFactory<EduNexusDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<EduNexus.Web.Services.UserSession>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
