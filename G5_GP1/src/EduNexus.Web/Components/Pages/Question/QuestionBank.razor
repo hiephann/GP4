@@ -2,57 +2,123 @@
 @using QuestionEntity = EduNexus.Api.Question.Entities.Question
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Question Bank</PageTitle>
+<PageTitle>Ngân hàng câu hỏi</PageTitle>
 
-<div class="page-header">
-    <h2>Question Bank <span class="screen-tag">Question · FT-03</span></h2>
-    <p class="text-muted">Ngân hàng câu hỏi trắc nghiệm — lọc theo module/độ khó.</p>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Ngân hàng câu hỏi <span class="badge bg-primary fs-6 rounded-pill align-text-top ms-2">FT-03</span></h2>
+        <p class="text-muted mb-0">Quản lý, tìm kiếm và phân loại câu hỏi trắc nghiệm theo module.</p>
+    </div>
+    <a class="btn btn-primary rounded-pill px-4 shadow-sm" href="question-detail">
+        <i class="bi bi-plus-lg me-2"></i>Thêm câu hỏi
+    </a>
 </div>
 
-<div class="card mb-3">
-    <div class="card-body d-flex gap-2 align-items-end flex-wrap">
-        <div style="min-width:220px">
-            <label class="form-label">Lọc theo module</label>
-            <select class="form-select lms-input" @onchange="OnFilterChanged">
-                <option value="">Tất cả</option>
-                @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
-            </select>
-        </div>
-        <div style="min-width:220px">
-            <label class="form-label">Tìm kiếm nội dung</label>
-            <input class="form-control lms-input" @bind="keyword" @bind:event="oninput" @bind:after="Reload" />
+<div class="lms-card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-body p-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold text-secondary small">Lọc theo Module</label>
+                <select class="form-select bg-light border-0" @onchange="OnFilterChanged">
+                    <option value="">Tất cả Module</option>
+                    @if (modules is not null)
+                    {
+                        @foreach (var m in modules)
+                        {
+                            <option value="@m.Id">@m.Title</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-8">
+                <label class="form-label fw-semibold text-secondary small">Tìm kiếm nội dung</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0"><i class="bi bi-search text-muted"></i></span>
+                    <input class="form-control bg-light border-0" placeholder="Nhập từ khóa cần tìm..." @bind="keyword" @bind:event="oninput" @bind:after="Reload" />
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
-@if (questions is null) { <p>Đang tải...</p> }
-else
-{
-    <table class="table lms-table table-striped">
-        <thead><tr><th>Nội dung</th><th>Độ khó</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>
-            @foreach (var q in questions)
-            {
-                <tr>
-                    <td>@q.Content</td>
-                    <td><span class="badge bg-info">@q.Difficulty</span></td>
-                    <td>@q.Status</td>
-                    <td><a class="btn btn-sm btn-outline-primary" href="@($"question-detail?id={q.Id}")">Chi tiết</a></td>
-                </tr>
-            }
-            @if (questions.Count == 0) { <tr><td colspan="4" class="text-muted">Không có câu hỏi.</td></tr> }
-        </tbody>
-    </table>
-    <a class="btn lms-btn-primary" href="question-detail">+ Thêm câu hỏi mới</a>
-}
+<div class="lms-card border-0 shadow-sm rounded-4 overflow-hidden">
+    @if (questions is null)
+    {
+        <div class="p-5 text-center text-muted">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <div>Đang tải dữ liệu...</div>
+        </div>
+    }
+    else if (questions.Count == 0)
+    {
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-3 text-secondary"></i>
+            <h5>Chưa có câu hỏi nào</h5>
+            <p>Hãy điều chỉnh bộ lọc hoặc thêm câu hỏi mới vào hệ thống.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4 text-secondary">Nội dung</th>
+                        <th class="text-secondary">Độ khó</th>
+                        <th class="text-secondary">Trạng thái</th>
+                        <th class="text-end pe-4 text-secondary">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    @foreach (var q in questions)
+                    {
+                        <tr>
+                            <td class="ps-4 fw-medium text-truncate" style="max-width: 400px;" title="@q.Content">
+                                @q.Content
+                            </td>
+                            <td>
+                                @if (q.Difficulty == "Easy")
+                                {
+                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3">Dễ</span>
+                                }
+                                else if (q.Difficulty == "Medium")
+                                {
+
+                                    <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3">Trung bình</span>
+                                }
+                                else
+                                {
+
+                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3">Khó</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @(q.Status == "Active" ? "bg-primary" : "bg-secondary") rounded-pill px-3">@q.Status</span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <a class="btn btn-light btn-sm rounded-circle text-primary" href="@($"question-detail?id={q.Id}")" title="Chi tiết">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
 
 @code {
+
     private List<Module>? modules;
     private List<QuestionEntity>? questions;
     private Guid? filterModule;
     private string keyword = "";
 
     protected override async Task OnInitializedAsync()
+
     {
         using var db = await DbFactory.CreateDbContextAsync();
         modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
@@ -61,8 +127,9 @@ else
 
     private async Task OnFilterChanged(ChangeEventArgs e)
     {
-        filterModule = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
-        await Reload();
+       filterModule = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+       await Reload();
+
     }
 
     private async Task Reload()
@@ -73,4 +140,5 @@ else
         if (!string.IsNullOrWhiteSpace(keyword)) query = query.Where(q => q.Content.Contains(keyword));
         questions = await query.OrderByDescending(q => q.CreatedAt).ToListAsync();
     }
+
 }

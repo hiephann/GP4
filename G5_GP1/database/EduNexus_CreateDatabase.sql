@@ -572,3 +572,4 @@ GO
 
 PRINT N'>>> EduNexus database created successfully.';
 GO
+
