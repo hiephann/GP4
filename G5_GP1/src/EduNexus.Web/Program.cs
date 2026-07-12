@@ -1,3 +1,5 @@
+using EduNexus.Api.Flashcard.Repositories;
+using EduNexus.Api.Flashcard.Services;
 using EduNexus.Api.Infrastructure;
 using EduNexus.Api.Infrastructure.Ai;
 using EduNexus.Api.Lesson.Repositories;
@@ -8,7 +10,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
+builder.Services.AddScoped<IFlashcardService, FlashcardService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
