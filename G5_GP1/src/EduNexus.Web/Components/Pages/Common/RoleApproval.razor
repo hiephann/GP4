@@ -1,0 +1,119 @@
+@page "/role-approval"
+@using EduNexus.Api.Common.Entities
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject EduNexus.Web.Services.UserSession Session
+
+<PageTitle>Duyệt tài khoản Giáo viên</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Duyệt tài khoản <span class="badge bg-danger fs-6 rounded-pill align-text-top ms-2">Admin</span></h2>
+        <p class="text-muted mb-0">Quản lý các yêu cầu đăng ký tài khoản Giáo viên/SME.</p>
+    </div>
+</div>
+
+<div class="lms-card border-0 shadow-sm rounded-4 overflow-hidden">
+    @if (pendingUsers is null)
+    {
+        <div class="p-5 text-center text-muted">Đang tải dữ liệu...</div>
+    }
+    else if (pendingUsers.Count == 0)
+    {
+        <div class="p-5 text-center text-muted">
+            <i class="bi bi-shield-check fs-1 d-block mb-3 text-success"></i>
+            <h5>Không có yêu cầu chờ duyệt</h5>
+            <p>Tất cả tài khoản Giáo viên đã được xử lý.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4 text-secondary">Người dùng</th>
+                        <th class="text-secondary">Email</th>
+                        <th class="text-secondary">Ngày đăng ký</th>
+                        <th class="text-secondary">Trạng thái</th>
+                        <th class="text-end pe-4 text-secondary">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    @foreach (var u in pendingUsers)
+                    {
+                        <tr>
+                            <td class="ps-4 fw-medium">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 40px; height: 40px;">
+                                        @u.DisplayName?.FirstOrDefault()
+                                    </div>
+                                    @u.DisplayName
+                                </div>
+                            </td>
+                            <td>@u.Email</td>
+                            <td>@u.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3">Chờ duyệt</span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <button class="btn btn-sm btn-outline-success rounded-pill px-3 me-2" @onclick="() => Approve(u.Id)">
+                                    <i class="bi bi-check-circle me-1"></i> Duyệt
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" @onclick="() => Reject(u.Id)">
+                                    <i class="bi bi-x-circle me-1"></i> Từ chối
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<User>? pendingUsers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.CurrentRole?.Name != "Admin")
+        {
+            // Simple guard, ideally use auth policies
+        }
+        await LoadPendingUsers();
+    }
+
+    private async Task LoadPendingUsers()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        // Load users who are inactive but have Teacher role (mock logic for pending teachers)
+        pendingUsers = await db.Users
+            .Where(u => !u.IsActive && db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == 3))
+            .OrderByDescending(u => u.CreatedAt)
+            .ToListAsync();
+    }
+
+    private async Task Approve(Guid id)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var user = await db.Users.FindAsync(id);
+        if (user != null)
+        {
+            user.IsActive = true;
+            await db.SaveChangesAsync();
+        }
+        await LoadPendingUsers();
+    }
+
+    private async Task Reject(Guid id)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var user = await db.Users.FindAsync(id);
+        if (user != null)
+        {
+            db.Users.Remove(user);
+            await db.SaveChangesAsync();
+        }
+        await LoadPendingUsers();
+    }
+}

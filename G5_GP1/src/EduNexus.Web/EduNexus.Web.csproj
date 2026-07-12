@@ -7,6 +7,7 @@
   <ItemGroup>
     <!-- Render markdown của lesson content / nội dung AI sinh ra -->
     <PackageReference Include="Markdig" Version="0.37.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

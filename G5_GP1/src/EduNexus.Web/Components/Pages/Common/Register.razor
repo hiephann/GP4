@@ -1,0 +1,160 @@
+@page "/register"
+@using EduNexus.Api.Common.Entities
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject NavigationManager NavManager
+
+<PageTitle>Đăng ký tài khoản — EduNexus G5</PageTitle>
+
+<div class="row g-0" style="min-height: 100vh;">
+    <!-- Cột trái: Hình ảnh/Branding -->
+    <div class="col-md-6 d-none d-md-flex flex-column justify-content-center align-items-center text-white position-relative overflow-hidden" 
+         style="background: var(--lms-primary-gradient);">
+        <div class="position-absolute" style="width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%; top: -50px; left: -50px;"></div>
+        <div class="position-absolute" style="width: 400px; height: 400px; background: rgba(255,255,255,0.05); border-radius: 50%; bottom: -100px; right: -100px;"></div>
+        
+        <div class="text-center z-1 px-5">
+            <div class="d-inline-flex align-items-center justify-content-center bg-white rounded-circle mb-4 shadow" 
+                 style="width: 80px; height: 80px; color: var(--lms-primary); font-size: 2.5rem;">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <h1 class="display-5 fw-bold mb-3">Tạo tài khoản mới</h1>
+            <p class="lead" style="opacity: 0.9;">Tham gia cộng đồng học tập trực tuyến hàng đầu.</p>
+        </div>
+    </div>
+
+    <!-- Cột phải: Form đăng ký -->
+    <div class="col-md-6 d-flex justify-content-center align-items-center bg-white">
+        <div class="w-100" style="max-width: 420px; padding: 2rem;">
+            <div class="mb-4 text-center">
+                <h3 class="fw-bold text-dark">Đăng ký</h3>
+                <p class="text-muted">Vui lòng điền thông tin để tham gia</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger py-2 small">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMessage
+                </div>
+            }
+            @if (isSuccess)
+            {
+                <div class="alert alert-success py-2 small">
+                    <i class="bi bi-check-circle-fill me-2"></i> Đăng ký thành công! Đang chuyển hướng...
+                </div>
+            }
+
+            <form @onsubmit="HandleRegister">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Họ và tên</label>
+                    <input type="text" class="form-control lms-input" @bind="displayName" required placeholder="Nguyễn Văn A">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Email</label>
+                    <input type="email" class="form-control lms-input" @bind="email" required placeholder="name@domain.com">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Mật khẩu</label>
+                    <input type="password" class="form-control lms-input" @bind="password" required placeholder="••••••••">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-dark">Bạn là ai?</label>
+                    <select class="form-select lms-input" @bind="roleSelection">
+                        <option value="Student">Học viên (Được duyệt ngay)</option>
+                        <option value="Teacher">Giảng viên / SME (Cần Admin duyệt)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn lms-btn-primary w-100 mb-3 py-2 fw-bold" disabled="@isLoading">
+                    @if (isLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Đang xử lý...</span>
+                    }
+                    else
+                    {
+                        <span>Đăng ký</span>
+                    }
+                </button>
+            </form>
+
+            <div class="text-center small text-muted">
+                Đã có tài khoản? <a href="/login" class="text-decoration-none fw-bold" style="color: var(--lms-primary);">Đăng nhập ngay</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string displayName = "";
+    private string email = "";
+    private string password = "";
+    private string roleSelection = "Student";
+    
+    private string errorMessage = "";
+    private bool isSuccess = false;
+    private bool isLoading = false;
+
+    private async Task HandleRegister()
+    {
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(displayName))
+        {
+            errorMessage = "Vui lòng nhập đầy đủ thông tin.";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = "";
+
+        try
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+            
+            // Check email exist
+            if (await db.Users.AnyAsync(u => u.Email == email))
+            {
+                errorMessage = "Email này đã được sử dụng.";
+                isLoading = false;
+                return;
+            }
+
+            var newUser = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                DisplayName = displayName,
+                PasswordHash = "$2a$12$mockhash", // In real project, use BCrypt
+                AuthProvider = "Local",
+                IsEmailVerified = true,
+                IsActive = roleSelection == "Student", // Teacher needs approval, so IsActive = false pending
+                CreatedAt = DateTime.UtcNow
+            };
+
+            db.Users.Add(newUser);
+
+            // Assign role
+            var roleId = roleSelection == "Student" ? 5 : 3; // 5 = Student, 3 = Teacher (mock mapping)
+            db.UserRoles.Add(new UserRole
+            {
+                UserId = newUser.Id,
+                RoleId = roleId
+            });
+
+            await db.SaveChangesAsync();
+
+            isSuccess = true;
+            await Task.Delay(1500);
+            NavManager.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Có lỗi xảy ra: " + ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

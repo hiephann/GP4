@@ -4,6 +4,8 @@ using EduNexus.Api.Lesson.Repositories;
 using EduNexus.Api.Lesson.Services;
 using EduNexus.Web.Components;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,14 @@ builder.Services.AddDbContextFactory<EduNexusDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<EduNexus.Web.Services.UserSession>();
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie()
+    .AddGoogle(options =>
+    {
+        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "mock-client-id";
+        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "mock-client-secret";
+    });
 
 // Các repository nhận EduNexusDbContext theo scope — lấy từ factory ở trên.
 builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<EduNexusDbContext>>().CreateDbContext());
@@ -39,6 +49,8 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

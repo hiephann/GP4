@@ -1,3 +1,6 @@
+@using EduNexus.Web.Components.Shared
+@inject EduNexus.Web.Services.UserSession Session
+
 <div class="p-3 d-flex align-items-center gap-2 border-bottom" style="height: 64px; border-color: var(--lms-border);">
     <div class="d-flex align-items-center justify-content-center rounded-2" 
          style="width: 32px; height: 32px; background: var(--lms-primary-gradient); color: white; font-size: 1.1rem;">
@@ -14,6 +17,16 @@
                      href="" Match="NavLinkMatch.All" style="transition: all 0.2s;">
                 <i class="bi bi-grid-1x2-fill fs-5" style="color: var(--lms-primary);"></i> Trang Chủ
             </NavLink>
+        </div>
+
+        <div class="nav-item px-3 mb-2">
+            <NavItem Href="profile" Icon="bi-person-circle" Text="Hồ sơ cá nhân" />
+        
+            @if (Session.CurrentRole?.Name == "Admin")
+            {
+                <div class="nav-item-divider my-2 border-bottom" style="border-color: rgba(0,0,0,0.1) !important"></div>
+                <NavItem Href="role-approval" Icon="bi-shield-check" Text="Duyệt tài khoản (Admin)" />
+            }
         </div>
 
         <!-- Group: Common -->
