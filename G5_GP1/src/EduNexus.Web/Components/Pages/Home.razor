@@ -1,103 +1,62 @@
 @page "/"
+@using EduNexus.Web.Services
+@inject UserSession Session
+@inject NavigationManager NavManager
 
-<PageTitle>EduNexus Dashboard — G5</PageTitle>
+<PageTitle>Đang điều hướng...</PageTitle>
 
-<!-- Welcome Section -->
-<div class="lms-card p-4 mb-4 text-white" style="background: var(--lms-primary-gradient); border: none;">
-    <div class="row align-items-center">
-        <div class="col-md-8">
-            <h2 class="fw-bold mb-2">Chào mừng đến với EduNexus G5 👋</h2>
-            <p class="mb-0" style="opacity: 0.9; font-size: 1.05rem;">
-                Hệ thống Quản lý Học tập & Đào tạo. Chọn một module bên dưới để tiếp tục công việc của bạn.
-            </p>
+<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="text-center">
+        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
         </div>
-        <div class="col-md-4 text-end d-none d-md-block">
-            <i class="bi bi-mortarboard" style="font-size: 4rem; opacity: 0.2;"></i>
-        </div>
+        <h4 class="text-muted">Đang tải không gian làm việc của bạn...</h4>
     </div>
 </div>
 
-<!-- Stats / Quick Links -->
-<div class="row g-4 mb-4 fade-in">
-    @foreach (var grp in Groups)
-    {
-        <div class="col-md-6 col-lg-4">
-            <div class="lms-card h-100 d-flex flex-column lms-card-interactive">
-                <div class="lms-section-header mb-0 p-3 border-bottom">
-                    <i class="bi @grp.Icon"></i>
-                    <div>
-                        <h5 class="mb-0">@grp.Name</h5>
-                        <div class="section-subtitle">@grp.Screens.Length màn hình</div>
-                    </div>
-                </div>
-                <div class="p-3 flex-grow-1" style="background: var(--lms-surface);">
-                    <div class="d-flex flex-column gap-2">
-                        @foreach (var s in grp.Screens)
-                        {
-                            <a href="@s.Href" class="d-flex align-items-center gap-2 p-2 rounded-2 text-decoration-none" 
-                               style="color: var(--lms-text-main); transition: background 0.2s;" 
-                               onmouseover="this.style.background='var(--lms-background)'" 
-                               onmouseout="this.style.background='transparent'">
-                                <i class="bi bi-arrow-right-short" style="color: var(--lms-primary);"></i>
-                                <span style="font-weight: 500; font-size: 0.9rem;">@s.Title</span>
-                            </a>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-</div>
-
 @code {
-    record Screen(string Title, string Href);
-    record Group(string Name, string Icon, Screen[] Screens);
-
-    static readonly Group[] Groups =
+    protected override void OnInitialized()
     {
-        new("Common & Commerce", "bi-grid", new Screen[]
+        Session.OnChange += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
         {
-            new("User Login", "login"),
-            new("Student Dashboard", "dashboard"),
-            new("Personal Progress", "progress"),
-            new("Course List", "courses"),
-            new("Course Structure", "course-structure"),
-        }),
-        new("Lesson Module", "bi-journal-richtext", new Screen[]
-        {
-            new("Lesson Editor", "lesson-editor"),
-            new("AI Lesson Staging", "ai-lesson-staging"),
-            new("Lesson Text Extract", "lesson-text-extract"),
-            new("Lesson View", "lesson-view"),
-        }),
-        new("Assignment Module", "bi-file-earmark-text", new Screen[]
-        {
-            new("Assignment List", "assignments"),
-            new("Assignment Detail", "assignment-detail"),
-            new("Assignment Submit", "assignment-submit"),
-            new("Assignment Result", "assignment-result"),
-        }),
-        new("Flashcard Module", "bi-card-heading", new Screen[]
-        {
-            new("Flashcard Editor", "flashcard-editor"),
-            new("AI Flashcard Staging", "ai-flashcard-staging"),
-            new("Flashcard Library", "flashcard-library"),
-            new("Flashcard Practice", "flashcard-practice"),
-        }),
-        new("Question Bank", "bi-question-square", new Screen[]
-        {
-            new("Question Bank", "question-bank"),
-            new("Question Detail", "question-detail"),
-            new("AI Question Staging", "ai-question-staging"),
-            new("Question Import", "question-import"),
-        }),
-        new("Quiz Module", "bi-ui-checks", new Screen[]
-        {
-            new("Quiz History", "quiz-history"),
-            new("New Quiz", "new-quiz"),
-            new("Quiz Taking", "quiz-taking"),
-            new("Quiz Results", "quiz-results"),
-            new("Quiz Review", "quiz-review"),
-        })
-    };
+            // Cho phép hệ thống tải xong trạng thái session
+            await Task.Delay(300); // Đợi xíu cho UX mượt
+            
+            if (!Session.IsLoggedIn)
+            {
+                NavManager.NavigateTo("/login");
+                return;
+            }
+
+            var role = Session.CurrentRole?.Name;
+            
+            if (role == "Student")
+            {
+                NavManager.NavigateTo("/dashboard");
+            }
+            else if (role == "Admin")
+            {
+                NavManager.NavigateTo("/dashboard"); // Admin tạm thời cũng vào dashboard
+            }
+            else if (role == "SME" || role == "Teacher")
+            {
+                NavManager.NavigateTo("/courses"); // Giáo viên vào màn quản lý khóa học
+            }
+            else
+            {
+                // Fallback
+                NavManager.NavigateTo("/login");
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= StateHasChanged;
+    }
 }
