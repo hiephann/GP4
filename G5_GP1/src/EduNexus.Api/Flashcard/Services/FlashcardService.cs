@@ -87,8 +87,8 @@ public class FlashcardService : IFlashcardService
             var cardIds = cardsInGroup.Select(c => c.Id).ToList();
 
             // Xóa toàn bộ tiến độ của học viên liên quan đến các thẻ bị xóa này
-            var progressItems = await _db.FlashcardProgresses.Where(p => cardIds.Contains(p.FlashcardId)).ToListAsync(ct);
-            _db.FlashcardProgresses.RemoveRange(progressItems);
+            var progressItems = await _db.FlashcardProgress.Where(p => cardIds.Contains(p.FlashcardId)).ToListAsync(ct);
+            _db.FlashcardProgress.RemoveRange(progressItems);
 
             // Xóa thẻ
             _db.Flashcards.RemoveRange(cardsInGroup);
@@ -136,7 +136,7 @@ public class FlashcardService : IFlashcardService
             .ToListAsync(ct);
 
         // Lấy danh sách các thẻ học viên ĐÃ THUỘC
-        var learnedCardIds = await _db.FlashcardProgresses
+        var learnedCardIds = await _db.FlashcardProgress
             .Where(p => p.StudentId == studentId && p.IsLearned && allCardIds.Contains(p.FlashcardId))
             .Select(p => p.FlashcardId)
             .ToListAsync(ct);
@@ -156,7 +156,7 @@ public class FlashcardService : IFlashcardService
 
     public async Task MarkAsync(Guid flashcardId, MarkFlashcardRequest request, CancellationToken ct = default)
     {
-        var progress = await _db.FlashcardProgresses
+        var progress = await _db.FlashcardProgress
             .FirstOrDefaultAsync(p => p.FlashcardId == flashcardId && p.StudentId == request.StudentId, ct);
 
         if (progress == null)
@@ -169,7 +169,7 @@ public class FlashcardService : IFlashcardService
                 IsLearned = request.IsLearned,
                 LastReviewedAt = DateTime.UtcNow
             };
-            _db.FlashcardProgresses.Add(progress);
+            _db.FlashcardProgress.Add(progress);
         }
         else
         {
