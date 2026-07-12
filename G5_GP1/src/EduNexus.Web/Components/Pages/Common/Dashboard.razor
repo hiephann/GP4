@@ -135,8 +135,11 @@ else
         // 1. Khóa học được cấp quyền (thông qua AccessGrants)
         var courseIds = await db.AccessGrants.Where(a => a.StudentId == sid && !a.IsRevoked && a.CourseId != null).Select(a => a.CourseId).ToListAsync();
         
-        // Học viên mock (Student.Le) chưa có AccessGrants trong DemoData. Ta có thể lấy tạm khóa học có sẵn nếu chưa có để demo đẹp
-        if (courseIds.Count == 0 && Session.CurrentRole?.Name == "Student") 
+        if (Session.CurrentRole?.Name == "Admin")
+        {
+            courses = await db.Courses.ToListAsync();
+        }
+        else if (courseIds.Count == 0 && Session.CurrentRole?.Name == "Student") 
         {
             courses = await db.Courses.Take(2).ToListAsync(); // Demo purposes
         }
@@ -146,11 +149,17 @@ else
         }
 
         // 2. Classes
-        var classIds = await db.ClassStudents.Where(cs => cs.StudentId == sid).Select(cs => cs.ClassId).ToListAsync();
-        classes = await db.Classes.Where(c => classIds.Contains(c.Id)).ToListAsync();
-
-        // 3. Packages
-        packages = await db.PackageSubscriptions.Where(ps => ps.StudentId == sid).ToListAsync();
+        if (Session.CurrentRole?.Name == "Admin")
+        {
+            classes = await db.Classes.ToListAsync();
+            packages = await db.PackageSubscriptions.ToListAsync();
+        }
+        else
+        {
+            var classIds = await db.ClassStudents.Where(cs => cs.StudentId == sid).Select(cs => cs.ClassId).ToListAsync();
+            classes = await db.Classes.Where(c => classIds.Contains(c.Id)).ToListAsync();
+            packages = await db.PackageSubscriptions.Where(ps => ps.StudentId == sid).ToListAsync();
+        }
     }
 
     public void Dispose()
