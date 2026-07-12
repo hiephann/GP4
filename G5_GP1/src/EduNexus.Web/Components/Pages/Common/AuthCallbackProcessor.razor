@@ -1,0 +1,70 @@
+@page "/auth/callback-processor"
+@using EduNexus.Api.Common.Entities
+@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject EduNexus.Web.Services.UserSession Session
+@inject NavigationManager NavManager
+
+<PageTitle>Đang xử lý đăng nhập...</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="text-center">
+        @if (string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h4>Đang đồng bộ phiên đăng nhập...</h4>
+            <p class="text-muted">Vui lòng đợi giây lát.</p>
+        }
+        else
+        {
+            <i class="bi bi-x-circle-fill text-danger d-block mb-3" style="font-size: 4rem;"></i>
+            <h4>Đăng nhập thất bại</h4>
+            <p class="text-danger">@errorMessage</p>
+            <a href="/login" class="btn btn-primary mt-3">Quay lại trang Đăng nhập</a>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Token { get; set; }
+
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(Token))
+        {
+            errorMessage = "Token xác thực không hợp lệ.";
+            return;
+        }
+
+        try
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+            var sessionToken = await db.LoginSessions
+                .FirstOrDefaultAsync(s => s.Id.ToString() == Token && s.ExpiresAt > DateTime.UtcNow && s.RevokedAt == null);
+
+            if (sessionToken == null)
+            {
+                errorMessage = "Phiên đăng nhập đã hết hạn hoặc không tồn tại.";
+                return;
+            }
+
+            // Đăng nhập vào Blazor Server UserSession
+            await Session.LoginAsync(sessionToken.UserId);
+            
+            // Xóa token đi để tránh dùng lại (One-time use)
+            db.LoginSessions.Remove(sessionToken);
+            await db.SaveChangesAsync();
+
+            // Thành công, chuyển hướng
+            NavManager.NavigateTo("/dashboard");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Lỗi hệ thống: " + ex.Message;
+        }
+    }
+}

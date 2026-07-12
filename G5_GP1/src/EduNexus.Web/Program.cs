@@ -15,6 +15,7 @@ builder.Services.AddScoped<IFlashcardService, FlashcardService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddControllers();
 
 // EF Core DbContext (SQL Server) — dùng Factory cho Blazor Server để tránh xung đột scope
 builder.Services.AddDbContextFactory<EduNexusDbContext>(options =>
@@ -57,5 +58,7 @@ app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapControllers();
 
 app.Run();
