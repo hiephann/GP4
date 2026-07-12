@@ -3,42 +3,88 @@
 
 <PageTitle>AI Question Staging</PageTitle>
 
-<div class="page-header">
-    <h2>AI Question Staging <span class="screen-tag">Question · BR-07</span></h2>
-    <p class="text-muted">AI gợi ý câu hỏi vào khu vực chờ duyệt — SME phê duyệt trước khi vào ngân hàng.</p>
-</div>
-
-<div class="card mb-3">
-    <div class="card-body">
-        <label class="form-label">Văn bản nguồn</label>
-        <textarea class="form-control mb-2" rows="3" @bind="source"></textarea>
-        <button class="btn btn-primary" @onclick="Generate"><span class="bi bi-robot"></span> Gợi ý câu hỏi (demo)</button>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">Trợ lý AI <span class="badge bg-info text-dark fs-6 rounded-pill align-text-top ms-2">BR-07</span></h2>
+        <p class="text-muted mb-0">Tự động phân tích văn bản nguồn và gợi ý câu hỏi trắc nghiệm.</p>
     </div>
 </div>
 
-<h6>Khu vực chờ duyệt</h6>
-@if (drafts is null) { <p>Đang tải...</p> }
-else
-{
-    <table class="table">
-        <thead><tr><th>Câu hỏi sinh ra (JSON)</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>
-            @foreach (var d in drafts)
-            {
-                <tr>
-                    <td style="max-width:520px">@d.GeneratedJson</td>
-                    <td><span class="badge bg-@(d.Status=="Approved"?"success":"warning")">@d.Status</span></td>
-                    <td>@if (d.Status == "Pending") { <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button> }</td>
-                </tr>
-            }
-            @if (drafts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bản nháp.</td></tr> }
-        </tbody>
-    </table>
-}
+<div class="card border-primary shadow-sm rounded-4 mb-5" style="border-width: 2px;">
+    <div class="card-body p-4">
+        <label class="form-label fw-bold text-primary mb-3">
+            <i class="bi bi-magic me-2"></i>Cung cấp văn bản nguồn cho AI
+        </label>
+        <textarea class="form-control bg-light border-0 mb-3" rows="4" @bind="source" placeholder="Dán nội dung bài học, tài liệu hoặc đoạn văn vào đây..."></textarea>
+        <div class="d-flex justify-content-end">
+            <button class="btn btn-primary rounded-pill px-4 shadow-sm" @onclick="Generate" disabled="@string.IsNullOrWhiteSpace(source)">
+                <i class="bi bi-robot me-2"></i>Sinh câu hỏi
+            </button>
+        </div>
+    </div>
+</div>
+
+<h5 class="fw-bold mb-3"><i class="bi bi-inbox me-2"></i>Khu vực chờ duyệt (Staging)</h5>
+
+<div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+    @if (drafts is null)
+    {
+        <div class="p-4 text-center text-muted">Đang tải dữ liệu AI...</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4 w-75 text-secondary">Nội dung sinh ra (JSON)</th>
+                        <th class="text-secondary">Trạng thái</th>
+                        <th class="text-end pe-4 text-secondary">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    @foreach (var d in drafts)
+                    {
+                        <tr>
+                            <td class="ps-4 py-3">
+                                <div class="bg-dark text-light p-2 rounded-3" style="max-height: 100px; overflow-y: auto; font-family: monospace; font-size: 0.85rem;">
+                                    @d.GeneratedJson
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge @(d.Status == "Approved" ? "bg-success bg-opacity-10 text-success" : "bg-warning bg-opacity-10 text-warning") rounded-pill px-3">
+                                    @(d.Status == "Approved" ? "Đã duyệt" : "Chờ duyệt")
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                @if (d.Status == "Pending")
+                                {
+                                    <button class="btn btn-sm btn-outline-success rounded-pill px-3" @onclick="() => Approve(d.Id)">
+                                        <i class="bi bi-check-circle me-1"></i> Duyệt
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small"><i class="bi bi-check2-all me-1"></i>Hoàn tất</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (drafts.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="3" class="text-center text-muted p-4">Chưa có bản nháp nào được tạo.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 
 @code {
     private string source = "";
-    private List<AiQuestionDraft>? drafts;
+    private List<EduNexus.Api.Question.Entities.AiQuestionDraft>? drafts;
 
     protected override async Task OnInitializedAsync() => await Load();
 
@@ -53,7 +99,7 @@ else
         if (string.IsNullOrWhiteSpace(source)) return;
         using var db = await DbFactory.CreateDbContextAsync();
         var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
-        db.AiQuestionDrafts.Add(new AiQuestionDraft
+        db.AiQuestionDrafts.Add(new EduNexus.Api.Question.Entities.AiQuestionDraft
         {
             Id = Guid.NewGuid(),
             CreatedById = anyUser ?? Guid.Empty,
@@ -71,7 +117,11 @@ else
     {
         using var db = await DbFactory.CreateDbContextAsync();
         var d = await db.AiQuestionDrafts.FindAsync(id);
-        if (d is not null) { d.Status = "Approved"; await db.SaveChangesAsync(); }
+        if (d != null && d.Status == "Pending")
+        {
+            d.Status = "Approved";
+            await db.SaveChangesAsync();
+        }
         await Load();
     }
 }
