@@ -1,4 +1,7 @@
 using EduNexus.Api.Infrastructure;
+using EduNexus.Api.Infrastructure.Ai;
+using EduNexus.Api.Lesson.Repositories;
+using EduNexus.Api.Lesson.Services;
 using EduNexus.Web.Components;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +14,14 @@ builder.Services.AddRazorComponents()
 // EF Core DbContext (SQL Server) — dùng Factory cho Blazor Server để tránh xung đột scope
 builder.Services.AddDbContextFactory<EduNexusDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Các repository nhận EduNexusDbContext theo scope — lấy từ factory ở trên.
+builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<EduNexusDbContext>>().CreateDbContext());
+
+// ----- Feature Lesson (FT-02, FT-06): Blazor -> Service -> Repository, dùng chung với EduNexus.Api -----
+builder.Services.AddEduNexusAi(builder.Configuration);
+builder.Services.AddScoped<ILessonRepository, LessonRepository>();
+builder.Services.AddScoped<ILessonService, LessonService>();
 
 var app = builder.Build();
 

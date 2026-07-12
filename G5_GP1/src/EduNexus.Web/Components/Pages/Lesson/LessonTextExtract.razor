@@ -1,49 +1,172 @@
 @page "/lesson-text-extract"
+@inject ILessonService Lessons
 
 <PageTitle>Lesson Text Extract</PageTitle>
 
 <div class="page-header">
-    <h2>Lesson Text Extract <span class="screen-tag">Lesson · FT-02</span></h2>
-    <p class="text-muted">Lấy transcript từ YouTube API, đẩy sang GenAI để format thành lesson summary.</p>
+    <h2>Lesson Text Extract <span class="screen-tag">Lesson · FT-02 · AC-02f</span></h2>
+    <p class="text-muted">
+        Lấy nội dung video từ YouTube rồi đẩy sang GenAI để format thành lesson summary.
+        Hệ thống thử lần lượt: <strong>phụ đề video</strong> → <strong>YouTube Data API v3</strong> (tiêu đề &amp; mô tả) → <strong>dán transcript thủ công</strong>.
+    </p>
 </div>
 
-<div class="card" style="max-width:720px">
-    <div class="card-body">
-        <label class="form-label">Đường dẫn YouTube</label>
-        <div class="input-group mb-3">
-            <input class="form-control" @bind="url" placeholder="https://www.youtube.com/watch?v=..." />
-            <button class="btn btn-primary" @onclick="Extract">
-                <span class="bi bi-youtube"></span> Trích & Tóm tắt
-            </button>
+<div class="lms-card p-4 mb-4">
+    <label class="form-label small text-uppercase text-muted fw-bold">Đường dẫn YouTube</label>
+    <div class="input-group mb-3">
+        <input class="form-control lms-input" @bind="url" placeholder="https://www.youtube.com/watch?v=..." />
+        <button class="btn lms-btn-primary" @onclick="Extract" disabled="@loading">
+            @if (loading)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Đang xử lý...</span>
+            }
+            else
+            {
+                <i class="bi bi-youtube me-2"></i>
+                <span>Trích & Tóm tắt</span>
+            }
+        </button>
+    </div>
+
+    @if (needManualTranscript)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Không lấy được nội dung video tự động. Hãy dán transcript vào ô bên dưới rồi bấm
+            <strong>Tóm tắt transcript đã dán</strong>.
         </div>
 
-        @if (loading)
+        <textarea class="form-control lms-focus-textarea mb-2" rows="8" @bind="manualTranscript"
+                  placeholder="Dán transcript của video vào đây..."></textarea>
+
+        <button class="btn lms-btn-primary" @onclick="SummarizeManual" disabled="@loading">
+            <i class="bi bi-magic me-2"></i> Tóm tắt transcript đã dán
+        </button>
+    }
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger mt-3 mb-0">
+            <i class="bi bi-x-circle-fill me-2"></i>@error
+        </div>
+    }
+</div>
+
+@if (result is not null)
+{
+    <div class="lms-card p-4">
+        <div class="d-flex flex-wrap gap-3 mb-3">
+            <span class="badge bg-primary">Nguồn: @result.TranscriptSource</span>
+            <span class="badge bg-secondary">Transcript: @result.TranscriptLength.ToString("N0") ký tự</span>
+            <span class="badge bg-info text-dark">AI: @result.Provider</span>
+            <span class="badge bg-dark">@result.TokensUsed.ToString("N0") tokens · @result.DurationMs ms</span>
+        </div>
+
+        <h6 class="fw-bold"><i class="bi bi-file-text text-primary me-2"></i>Lesson Summary</h6>
+        <div class="border rounded p-3 bg-light">
+            <MarkdownView Markdown="@result.Summary" />
+        </div>
+
+        <hr />
+
+        <label class="form-label small text-uppercase text-muted fw-bold">Lưu tóm tắt vào nội dung video của bài học</label>
+        <div class="input-group" style="max-width:640px">
+            <select class="form-select lms-input" @bind="targetContentId">
+                <option value="">-- chọn nội dung video --</option>
+                @foreach (var c in videoContents)
+                {
+                    <option value="@c.Id">@c.YoutubeUrl</option>
+                }
+            </select>
+            <button class="btn btn-outline-primary" @onclick="SaveSummary" disabled="@loading">
+                <i class="bi bi-save me-1"></i> Lưu vào bài học
+            </button>
+        </div>
+        @if (saved is not null)
         {
-            <div class="d-flex align-items-center gap-2"><div class="spinner-border spinner-border-sm"></div> Đang xử lý...</div>
-        }
-        else if (summary is not null)
-        {
-            <div class="alert alert-success">
-                <h6>Lesson Summary (demo)</h6>
-                <p class="mb-0">@summary</p>
-            </div>
+            <div class="alert alert-success mt-3 mb-0"><i class="bi bi-check-circle-fill me-2"></i>@saved</div>
         }
     </div>
-</div>
+}
 
 @code {
     private string url = "";
-    private string? summary;
-    private bool loading;
+    private string manualTranscript = "";
+    private string? targetContentId;
 
-    private async Task Extract()
+    private LessonSummaryDto? result;
+    private List<LessonContentDto> videoContents = new();
+
+    private string? error, saved;
+    private bool loading, needManualTranscript;
+
+    protected override async Task OnInitializedAsync() => await LoadVideoContents();
+
+    private async Task LoadVideoContents() => videoContents = await Lessons.GetVideoContentsAsync();
+
+    private Task Extract() => Summarize(new ExtractTranscriptRequest(url));
+
+    private Task SummarizeManual() => Summarize(new ExtractTranscriptRequest(url, manualTranscript));
+
+    private async Task Summarize(ExtractTranscriptRequest request)
     {
-        if (string.IsNullOrWhiteSpace(url)) return;
-        loading = true; summary = null;
-        await Task.Delay(600); // mô phỏng gọi YouTube API + GenAI
-        summary = $"[Tóm tắt AI demo] Video {url} gồm các ý chính: giới thiệu chủ đề, " +
-                  "trình bày khái niệm cốt lõi, ví dụ minh họa và tổng kết. " +
-                  "(Thực tế: lấy transcript qua YouTube Data API rồi format qua GenAI — AC-02f, ưu tiên tiếng Việt.)";
-        loading = false;
+        if (loading) return;
+        loading = true;
+        error = saved = null;
+        result = null;
+
+        try
+        {
+            result = await Lessons.ExtractAndSummarizeAsync(request);
+            needManualTranscript = false;
+
+            // Tóm tắt xong thì gợi ý sẵn content video khớp URL để SME lưu vào đúng chỗ.
+            targetContentId = videoContents.FirstOrDefault(c => c.YoutubeUrl == url.Trim())?.Id.ToString();
+        }
+        catch (TranscriptUnavailableException ex)
+        {
+            needManualTranscript = true;
+            error = ex.Message;
+        }
+        catch (LessonValidationException ex)
+        {
+            error = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            error = ex.Message;   // lỗi gọi Gemini
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task SaveSummary()
+    {
+        if (result is null || !Guid.TryParse(targetContentId, out var contentId))
+        {
+            error = "Hãy chọn nội dung video để lưu tóm tắt.";
+            return;
+        }
+
+        loading = true;
+        error = saved = null;
+
+        try
+        {
+            await Lessons.SaveSummaryAsync(contentId, result.Summary);
+            await LoadVideoContents();
+            saved = "Đã lưu tóm tắt vào nội dung bài học — kiểm tra ở màn Lesson View.";
+        }
+        catch (LessonValidationException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
     }
 }

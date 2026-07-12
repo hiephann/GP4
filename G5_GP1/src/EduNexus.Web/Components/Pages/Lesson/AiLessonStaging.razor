@@ -1,84 +1,257 @@
 @page "/ai-lesson-staging"
-@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject ILessonService Lessons
 
 <PageTitle>AI Lesson Staging</PageTitle>
 
 <div class="page-header">
     <h2>AI Lesson Staging <span class="screen-tag">Lesson · FT-02 · BR-07</span></h2>
-    <p class="text-muted">Tạo lesson text bằng AI; SME xem lại, chỉnh sửa và phê duyệt.</p>
+    <p class="text-muted">AI sinh nội dung bài giảng; SME xem lại, chỉnh sửa và phê duyệt trước khi đưa vào bài học.</p>
 </div>
 
-<div class="card mb-3">
-    <div class="card-body">
-        <label class="form-label">Đề cương / văn bản nguồn</label>
-        <textarea class="form-control mb-2" rows="3" @bind="outline" placeholder="Nhập đề cương để AI mở rộng thành bài giảng..."></textarea>
-        <button class="btn btn-primary" @onclick="Generate">
-            <span class="bi bi-robot"></span> Sinh nội dung (demo)
-        </button>
+<div class="lms-card p-4 mb-4">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small text-uppercase text-muted fw-bold">SME (mô phỏng đăng nhập)</label>
+            <select class="form-select lms-input" @bind="smeId">
+                <option value="">-- chọn người dùng --</option>
+                @foreach (var u in users)
+                {
+                    <option value="@u.Id">@u.DisplayName</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small text-uppercase text-muted fw-bold">Bài học đích (tùy chọn)</label>
+            <select class="form-select lms-input" @bind="targetLessonId">
+                <option value="">-- chọn khi duyệt cũng được --</option>
+                @foreach (var l in lessonOptions)
+                {
+                    <option value="@l.Id">@l.Title</option>
+                }
+            </select>
+        </div>
     </div>
+
+    <label class="form-label small text-uppercase text-muted fw-bold mt-3">Đề cương / văn bản nguồn</label>
+    <textarea class="form-control lms-focus-textarea" rows="4" @bind="outline"
+              placeholder="Ví dụ: Biến và kiểu dữ liệu trong C#; toán tử; câu lệnh điều kiện; vòng lặp"></textarea>
+
+    <button class="btn lms-btn-primary mt-3" @onclick="Generate" disabled="@generating">
+        @if (generating)
+        {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            <span>AI đang soạn nội dung...</span>
+        }
+        else
+        {
+            <i class="bi bi-robot me-2"></i>
+            <span>Sinh nội dung bằng AI</span>
+        }
+    </button>
 </div>
 
-<h6>Khu vực chờ duyệt</h6>
-@if (drafts is null) { <p>Đang tải...</p> }
-else
+@if (message is not null)
 {
-    <table class="table">
-        <thead><tr><th>Nội dung sinh ra</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>
-            @foreach (var d in drafts)
+    <div class="alert @(ok ? "alert-success" : "alert-danger") d-flex align-items-center">
+        <i class="bi @(ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") fs-5 me-2"></i>
+        <div>@message</div>
+    </div>
+}
+
+<h5 class="fw-bold mb-3">Khu vực chờ duyệt (@drafts.Count)</h5>
+
+@if (drafts.Count == 0)
+{
+    <p class="text-muted">Chưa có bản nháp nào.</p>
+}
+
+@foreach (var d in drafts)
+{
+    <div class="lms-card p-4 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <span class="badge bg-@StatusColor(d.Status)">@d.Status</span>
+                <span class="text-muted small ms-2">@d.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+            </div>
+            @if (d.Status == "Pending")
             {
-                <tr>
-                    <td style="max-width:520px">@d.GeneratedText</td>
-                    <td><span class="badge bg-@(d.Status=="Approved"?"success":"warning")">@d.Status</span></td>
-                    <td>
-                        @if (d.Status == "Pending")
-                        {
-                            <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button>
-                        }
-                    </td>
-                </tr>
+                <div class="d-flex gap-2">
+                    @if (editingId == d.Id)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => CancelEdit()">Hủy sửa</button>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => SaveEdit(d.Id)" disabled="@busy">Lưu bản sửa</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(d)">
+                            <i class="bi bi-pencil"></i> Sửa
+                        </button>
+                    }
+                    <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)" disabled="@busy">
+                        <i class="bi bi-check-lg"></i> Phê duyệt
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Reject(d.Id)" disabled="@busy">
+                        <i class="bi bi-x-lg"></i> Từ chối
+                    </button>
+                </div>
             }
-            @if (drafts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bản nháp.</td></tr> }
-        </tbody>
-    </table>
+        </div>
+
+        <div class="text-muted small mb-2"><strong>Nguồn:</strong> @d.SourceText</div>
+
+        @if (editingId == d.Id)
+        {
+            <textarea class="form-control lms-focus-textarea" rows="14" @bind="editText"></textarea>
+        }
+        else
+        {
+            <div class="border rounded p-3 bg-light" style="max-height:340px; overflow-y:auto">
+                <MarkdownView Markdown="@d.GeneratedText" />
+            </div>
+        }
+    </div>
 }
 
 @code {
+    private List<AiLessonDraftDto> drafts = new();
+    private List<UserOptionDto> users = new();
+    private List<LessonListItemDto> lessonOptions = new();
+
     private string outline = "";
-    private List<AiLessonDraft>? drafts;
+    private string? smeId, targetLessonId;
 
-    protected override async Task OnInitializedAsync() => await Load();
+    private Guid? editingId;
+    private string editText = "";
 
-    private async Task Load()
+    private string? message;
+    private bool ok, busy, generating;
+
+    protected override async Task OnInitializedAsync()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        drafts = await db.AiLessonDrafts.OrderByDescending(d => d.CreatedAt).ToListAsync();
+        users = await Lessons.GetUserOptionsAsync();
+        await LoadLessonOptions();
+        await LoadDrafts();
+    }
+
+    private async Task LoadDrafts() => drafts = await Lessons.GetDraftsAsync();
+
+    /// <summary>Gom bài học của mọi module để SME chọn nơi gắn nội dung sau khi duyệt.</summary>
+    private async Task LoadLessonOptions()
+    {
+        var modules = await Lessons.GetModuleOptionsAsync();
+        var all = new List<LessonListItemDto>();
+
+        foreach (var m in modules)
+            all.AddRange(await Lessons.GetLessonsByModuleAsync(m.Id));
+
+        lessonOptions = all;
     }
 
     private async Task Generate()
     {
-        if (string.IsNullOrWhiteSpace(outline)) return;
-        using var db = await DbFactory.CreateDbContextAsync();
-        var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
-        db.AiLessonDrafts.Add(new AiLessonDraft
+        if (generating) return;
+        generating = true;
+        message = null;
+
+        try
         {
-            Id = Guid.NewGuid(),
-            CreatedById = anyUser ?? Guid.Empty,
-            SourceText = outline,
-            GeneratedText = $"[AI demo] Bài giảng mở rộng từ: \"{outline}\". (Nội dung do AI sinh — chờ SME duyệt.)",
-            Status = "Pending",
-            CreatedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
-        outline = "";
-        await Load();
+            Guid.TryParse(smeId, out var sme);
+            Guid.TryParse(targetLessonId, out var lesson);
+
+            await Lessons.GenerateDraftAsync(
+                new GenerateLessonRequest(lesson == Guid.Empty ? null : lesson, outline), sme);
+
+            outline = "";
+            await LoadDrafts();
+            Success("AI đã sinh xong bản nháp — đang chờ SME duyệt (BR-07).");
+        }
+        catch (LessonValidationException ex)
+        {
+            Fail(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Gọi Gemini thất bại (sai key, hết quota, bị bộ lọc chặn...)
+            Fail(ex.Message);
+        }
+        finally
+        {
+            generating = false;
+        }
     }
 
-    private async Task Approve(Guid id)
+    private void StartEdit(AiLessonDraftDto d)
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        var d = await db.AiLessonDrafts.FindAsync(id);
-        if (d is not null) { d.Status = "Approved"; await db.SaveChangesAsync(); }
-        await Load();
+        editingId = d.Id;
+        editText = d.GeneratedText ?? "";
     }
+
+    private void CancelEdit() => editingId = null;
+
+    private async Task SaveEdit(Guid draftId)
+        => await Run(async () =>
+        {
+            await Lessons.UpdateDraftTextAsync(draftId, editText);
+            editingId = null;
+            await LoadDrafts();
+            Success("Đã lưu bản sửa của SME.");
+        });
+
+    private async Task Approve(Guid draftId)
+        => await Run(async () =>
+        {
+            Guid.TryParse(targetLessonId, out var lesson);
+            await Lessons.ApproveDraftAsync(draftId, lesson == Guid.Empty ? null : lesson);
+
+            await LoadDrafts();
+            await LoadLessonOptions();
+            Success("Đã phê duyệt — nội dung được thêm vào bài học, xem ở màn Lesson View.");
+        });
+
+    private async Task Reject(Guid draftId)
+        => await Run(async () =>
+        {
+            await Lessons.RejectDraftAsync(draftId);
+            await LoadDrafts();
+            Success("Đã từ chối bản nháp.");
+        });
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true;
+        message = null;
+
+        try
+        {
+            await action();
+        }
+        catch (LessonValidationException ex)
+        {
+            Fail(ex.Message);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void Success(string text)
+    {
+        ok = true;
+        message = text;
+    }
+
+    private void Fail(string text)
+    {
+        ok = false;
+        message = text;
+    }
+
+    private static string StatusColor(string status) => status switch
+    {
+        "Approved" => "success",
+        "Rejected" => "secondary",
+        _ => "warning"
+    };
 }

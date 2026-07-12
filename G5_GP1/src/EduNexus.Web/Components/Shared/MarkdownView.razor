@@ -1,0 +1,18 @@
+@using Markdig
+
+@* Render markdown của lesson content / nội dung AI sinh ra. *@
+<div class="markdown-body">@RenderedHtml</div>
+
+@code {
+    // DisableHtml: nội dung do AI sinh hoặc SME nhập không được phép chèn HTML thô (chống XSS).
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
+    [Parameter, EditorRequired] public string? Markdown { get; set; }
+
+    private MarkupString RenderedHtml => string.IsNullOrWhiteSpace(Markdown)
+        ? new MarkupString(string.Empty)
+        : new MarkupString(Markdig.Markdown.ToHtml(Markdown, Pipeline));
+}
