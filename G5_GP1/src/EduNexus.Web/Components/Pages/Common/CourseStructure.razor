@@ -10,7 +10,7 @@
 
 <div class="mb-3" style="max-width:480px">
     <label class="form-label">Chọn khóa học</label>
-    <select class="form-select" value="@selectedId" @onchange="OnCourseChanged">
+    <select class="form-select lms-input" value="@selectedId" @onchange="OnCourseChanged">
         <option value="">-- chọn --</option>
         @if (courses is not null)
         {
@@ -22,8 +22,8 @@
 @if (selectedId is not null)
 {
     <div class="d-flex gap-2 mb-3">
-        <input class="form-control" style="max-width:320px" @bind="newModuleTitle" placeholder="Tên module mới" />
-        <button class="btn btn-primary" @onclick="AddModule">+ Thêm module</button>
+        <input class="form-control lms-input" style="max-width:320px" @bind="newModuleTitle" placeholder="Tên module mới" />
+        <button class="btn lms-btn-primary" @onclick="AddModule">+ Thêm module</button>
     </div>
 
     @if (modules!.Count == 0)
@@ -32,7 +32,7 @@
     }
     else
     {
-        <table class="table">
+        <table class="table lms-table">
             <thead><tr><th>#</th><th>Module</th><th>Lessons</th><th>Questions</th><th>Flashcards</th><th>Assignments</th></tr></thead>
             <tbody>
                 @foreach (var m in modules)

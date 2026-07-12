@@ -10,7 +10,7 @@
 
 <div class="mb-3" style="max-width:480px">
     <label class="form-label">Chọn module</label>
-    <select class="form-select" @onchange="OnModuleChanged">
+    <select class="form-select lms-input" @onchange="OnModuleChanged">
         <option value="">-- chọn --</option>
         @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
     </select>
@@ -31,7 +31,7 @@
                 </div>
                 <div class="card-body d-flex gap-2">
                     <input class="form-control form-control-sm" @bind="newGroupName" placeholder="Tên nhóm" />
-                    <button class="btn btn-sm btn-primary" @onclick="AddGroup">+</button>
+                    <button class="btn btn-sm lms-btn-primary" @onclick="AddGroup">+</button>
                 </div>
             </div>
         </div>
@@ -40,12 +40,12 @@
             {
                 <div class="card mb-3">
                     <div class="card-body d-flex gap-2 align-items-end">
-                        <div class="flex-grow-1"><label class="form-label">Mặt trước</label><input class="form-control" @bind="front" /></div>
-                        <div class="flex-grow-1"><label class="form-label">Mặt sau</label><input class="form-control" @bind="back" /></div>
-                        <button class="btn btn-primary" @onclick="AddCard">+ Thẻ</button>
+                        <div class="flex-grow-1"><label class="form-label">Mặt trước</label><input class="form-control lms-input" @bind="front" /></div>
+                        <div class="flex-grow-1"><label class="form-label">Mặt sau</label><input class="form-control lms-input" @bind="back" /></div>
+                        <button class="btn lms-btn-primary" @onclick="AddCard">+ Thẻ</button>
                     </div>
                 </div>
-                <table class="table table-sm">
+                <table class="table lms-table table-sm">
                     <thead><tr><th>Thuật ngữ</th><th>Định nghĩa</th></tr></thead>
                     <tbody>
                         @foreach (var c in cards!) { <tr><td>@c.FrontText</td><td>@c.BackText</td></tr> }

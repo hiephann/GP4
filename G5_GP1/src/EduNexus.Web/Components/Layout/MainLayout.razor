@@ -1,19 +1,43 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="lms-layout">
+    <div class="lms-sidebar">
         <NavMenu />
     </div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+    <div class="lms-main">
+        <header class="lms-header justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-list fs-4 text-muted d-md-none" style="cursor: pointer;"></i>
+                <h5 class="mb-0 fw-bold" style="color: var(--lms-text-main);">Hệ thống Học tập & Đào tạo EduNexus</h5>
+            </div>
+            
+            <div class="d-flex align-items-center gap-4">
+                <div class="position-relative" style="cursor: pointer;">
+                    <i class="bi bi-bell fs-5 text-muted"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                        <span class="visually-hidden">New alerts</span>
+                    </span>
+                </div>
+                
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;">
+                    <div class="d-flex align-items-center justify-content-center fw-bold rounded-circle" 
+                         style="width: 36px; height: 36px; background: var(--lms-primary-gradient); color: white; font-size: 0.9rem;">
+                        HV
+                    </div>
+                    <div class="d-none d-md-block">
+                        <div class="fw-bold" style="font-size: 0.85rem; line-height: 1.2;">Học Viên</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">Student Role</div>
+                    </div>
+                    <i class="bi bi-chevron-down text-muted small ms-1"></i>
+                </div>
+            </div>
+        </header>
 
-        <article class="content px-4">
+        <main class="lms-content">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui">

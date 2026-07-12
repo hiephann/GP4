@@ -10,7 +10,7 @@
 
 <div class="mb-3" style="max-width:420px">
     <label class="form-label">Chọn học viên</label>
-    <select class="form-select" @onchange="OnStudentChanged">
+    <select class="form-select lms-input" @onchange="OnStudentChanged">
         <option value="">-- chọn --</option>
         @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
     </select>
@@ -18,7 +18,7 @@
 
 @if (attempts is not null)
 {
-    <table class="table table-striped">
+    <table class="table lms-table table-striped">
         <thead><tr><th>Ngày nộp</th><th>Điểm</th><th></th></tr></thead>
         <tbody>
             @foreach (var a in attempts)

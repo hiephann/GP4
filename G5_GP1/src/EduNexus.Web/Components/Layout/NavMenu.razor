@@ -1,55 +1,63 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">EduNexus — G5</a>
+<div class="p-3 d-flex align-items-center gap-2 border-bottom" style="height: 64px; border-color: var(--lms-border);">
+    <div class="d-flex align-items-center justify-content-center rounded-2" 
+         style="width: 32px; height: 32px; background: var(--lms-primary-gradient); color: white; font-size: 1.1rem;">
+        <i class="bi bi-mortarboard-fill"></i>
     </div>
+    <span class="fw-bold fs-5 text-dark">EduNexus <span style="color: var(--lms-primary);">G5</span></span>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Trang chủ
+<div class="nav-scrollable flex-grow-1 overflow-auto py-2" style="background: var(--lms-surface);">
+    <nav class="flex-column mb-4">
+        <!-- Dashboard -->
+        <div class="nav-item px-3 mb-2">
+            <NavLink class="nav-link d-flex align-items-center gap-2 py-2 px-3 rounded-2 text-dark fw-medium" 
+                     href="" Match="NavLinkMatch.All" style="transition: all 0.2s;">
+                <i class="bi bi-grid-1x2-fill fs-5" style="color: var(--lms-primary);"></i> Trang Chủ
             </NavLink>
         </div>
 
-        <div class="nav-group-title">Common</div>
+        <!-- Group: Common -->
+        <div class="nav-group-title mt-3">Common</div>
         <NavItem Href="login" Icon="bi-box-arrow-in-right" Text="User Login" />
-        <NavItem Href="dashboard" Icon="bi-grid" Text="Student Dashboard" />
+        <NavItem Href="dashboard" Icon="bi-speedometer2" Text="Student Dashboard" />
         <NavItem Href="progress" Icon="bi-graph-up" Text="Personal Progress" />
-        <NavItem Href="courses" Icon="bi-collection" Text="Course List" />
+        <NavItem Href="courses" Icon="bi-collection-play" Text="Course List" />
         <NavItem Href="course-structure" Icon="bi-diagram-3" Text="Course Structure" />
 
-        <div class="nav-group-title">Lesson</div>
+        <!-- Group: Lesson -->
+        <div class="nav-group-title mt-3">Lesson</div>
         <NavItem Href="lesson-editor" Icon="bi-pencil-square" Text="Lesson Editor" />
         <NavItem Href="ai-lesson-staging" Icon="bi-robot" Text="AI Lesson Staging" />
-        <NavItem Href="lesson-text-extract" Icon="bi-youtube" Text="Lesson Text Extract" />
-        <NavItem Href="lesson-view" Icon="bi-book" Text="Lesson View" />
+        <NavItem Href="lesson-text-extract" Icon="bi-file-earmark-break" Text="Lesson Text Extract" />
+        <NavItem Href="lesson-view" Icon="bi-book-half" Text="Lesson View" />
 
-        <div class="nav-group-title">Assignment</div>
+        <!-- Group: Assignment -->
+        <div class="nav-group-title mt-3">Assignment</div>
         <NavItem Href="assignments" Icon="bi-list-task" Text="Assignment List" />
-        <NavItem Href="assignment-detail" Icon="bi-file-text" Text="Assignment Detail" />
-        <NavItem Href="assignment-submit" Icon="bi-upload" Text="Assignment Submit" />
+        <NavItem Href="assignment-detail" Icon="bi-file-earmark-text" Text="Assignment Detail" />
+        <NavItem Href="assignment-submit" Icon="bi-cloud-arrow-up" Text="Assignment Submit" />
         <NavItem Href="assignment-result" Icon="bi-clipboard-check" Text="Assignment Result" />
 
-        <div class="nav-group-title">Flashcard</div>
-        <NavItem Href="flashcard-editor" Icon="bi-pencil" Text="Flashcard Editor" />
+        <!-- Group: Flashcard -->
+        <div class="nav-group-title mt-3">Flashcard</div>
+        <NavItem Href="flashcard-editor" Icon="bi-card-heading" Text="Flashcard Editor" />
         <NavItem Href="ai-flashcard-staging" Icon="bi-robot" Text="AI Flashcard Staging" />
         <NavItem Href="flashcard-library" Icon="bi-stack" Text="Flashcard Library" />
         <NavItem Href="flashcard-practice" Icon="bi-arrow-repeat" Text="Flashcard Practice" />
 
-        <div class="nav-group-title">Question</div>
-        <NavItem Href="question-bank" Icon="bi-question-circle" Text="Question Bank" />
-        <NavItem Href="question-detail" Icon="bi-file-earmark-text" Text="Question Detail" />
+        <!-- Group: Question -->
+        <div class="nav-group-title mt-3">Question</div>
+        <NavItem Href="question-bank" Icon="bi-question-square" Text="Question Bank" />
+        <NavItem Href="question-detail" Icon="bi-ui-checks-grid" Text="Question Detail" />
         <NavItem Href="ai-question-staging" Icon="bi-robot" Text="AI Question Staging" />
         <NavItem Href="question-import" Icon="bi-file-earmark-excel" Text="Question Import" />
 
-        <div class="nav-group-title">Quiz</div>
+        <!-- Group: Quiz -->
+        <div class="nav-group-title mt-3">Quiz</div>
         <NavItem Href="quiz-history" Icon="bi-clock-history" Text="Quiz History" />
         <NavItem Href="new-quiz" Icon="bi-plus-circle" Text="New Quiz" />
         <NavItem Href="quiz-taking" Icon="bi-ui-checks" Text="Quiz Taking" />
-        <NavItem Href="quiz-results" Icon="bi-bar-chart" Text="Quiz Results" />
+        <NavItem Href="quiz-results" Icon="bi-bar-chart-steps" Text="Quiz Results" />
         <NavItem Href="quiz-review" Icon="bi-search" Text="Quiz Review" />
     </nav>
 </div>

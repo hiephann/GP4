@@ -11,7 +11,7 @@
 
 <div class="mb-3" style="max-width:480px">
     <label class="form-label">Chọn module</label>
-    <select class="form-select" @onchange="OnModuleChanged">
+    <select class="form-select lms-input" @onchange="OnModuleChanged">
         <option value="">-- chọn --</option>
         @if (modules is not null)
         {
@@ -35,7 +35,7 @@
                 </div>
                 <div class="card-body d-flex gap-2">
                     <input class="form-control form-control-sm" @bind="newLessonTitle" placeholder="Tên bài mới" />
-                    <button class="btn btn-sm btn-primary" @onclick="AddLesson">+</button>
+                    <button class="btn btn-sm lms-btn-primary" @onclick="AddLesson">+</button>
                 </div>
             </div>
         </div>
@@ -47,7 +47,7 @@
                     <div class="card-body">
                         <div class="mb-2">
                             <label class="form-label">Loại nội dung</label>
-                            <select class="form-select" @bind="contentType">
+                            <select class="form-select lms-input" @bind="contentType">
                                 <option>Markdown</option>
                                 <option>YoutubeVideo</option>
                                 <option>File</option>
@@ -55,17 +55,17 @@
                         </div>
                         @if (contentType == "Markdown")
                         {
-                            <textarea class="form-control" rows="6" @bind="markdown" placeholder="# Nội dung markdown..."></textarea>
+                            <textarea class="form-control lms-input" rows="6" @bind="markdown" placeholder="# Nội dung markdown..."></textarea>
                         }
                         else if (contentType == "YoutubeVideo")
                         {
-                            <input class="form-control" @bind="youtubeUrl" placeholder="https://youtube.com/watch?v=..." />
+                            <input class="form-control lms-input" @bind="youtubeUrl" placeholder="https://youtube.com/watch?v=..." />
                         }
                         else
                         {
-                            <input class="form-control" @bind="fileName" placeholder="Tên tệp (PDF/Word/ZIP)" />
+                            <input class="form-control lms-input" @bind="fileName" placeholder="Tên tệp (PDF/Word/ZIP)" />
                         }
-                        <button class="btn btn-primary mt-2" @onclick="SaveContent">Lưu nội dung</button>
+                        <button class="btn lms-btn-primary mt-2" @onclick="SaveContent">Lưu nội dung</button>
                     </div>
                 </div>
 

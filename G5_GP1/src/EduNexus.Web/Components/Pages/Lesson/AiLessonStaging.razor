@@ -12,7 +12,7 @@
     <div class="card-body">
         <label class="form-label">Đề cương / văn bản nguồn</label>
         <textarea class="form-control mb-2" rows="3" @bind="outline" placeholder="Nhập đề cương để AI mở rộng thành bài giảng..."></textarea>
-        <button class="btn btn-primary" @onclick="Generate">
+        <button class="btn lms-btn-primary" @onclick="Generate">
             <span class="bi bi-robot"></span> Sinh nội dung (demo)
         </button>
     </div>
@@ -22,7 +22,7 @@
 @if (drafts is null) { <p>Đang tải...</p> }
 else
 {
-    <table class="table">
+    <table class="table lms-table">
         <thead><tr><th>Nội dung sinh ra</th><th>Trạng thái</th><th></th></tr></thead>
         <tbody>
             @foreach (var d in drafts)
@@ -33,7 +33,7 @@ else
                     <td>
                         @if (d.Status == "Pending")
                         {
-                            <button class="btn btn-sm btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button>
+                            <button class="btn btn-sm lms-btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button>
                         }
                     </td>
                 </tr>

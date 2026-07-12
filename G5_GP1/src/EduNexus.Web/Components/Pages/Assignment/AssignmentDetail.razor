@@ -1,146 +1,276 @@
 @page "/assignment-detail"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Assignment Detail - Cấu Hình</PageTitle>
+<PageTitle>Cấu Hình Bài Tập — EduNexus</PageTitle>
 
-<div class="page-header d-flex justify-content-between align-items-end mb-4">
+<!-- Page Header -->
+<div class="page-header d-flex justify-content-between align-items-end">
     <div>
         <h2>Cấu Hình Bài Tập <span class="screen-tag">Assignment · FT-05</span></h2>
-        <p class="text-muted mb-0">Biên soạn nội dung (Markdown) và thiết lập Rubric đánh giá.</p>
+        <p class="text-muted mb-0">Biên soạn đề bài (Markdown), thiết lập hạn nộp và cấu hình Rubric đánh giá.</p>
     </div>
-    <div style="min-width: 300px;">
-        <select class="form-select lms-input" value="@selectedId" @onchange="OnChanged">
-            <option value="">-- Chuyển bài tập khác --</option>
+    <div style="min-width: 320px;">
+        <select class="form-select lms-input" value="@selectedId" @onchange="OnChanged" id="select-assignment">
+            <option value="">— Chọn bài tập —</option>
             @if (items is not null)
             {
-                @foreach (var a in items) { <option value="@a.Id">@a.Title</option> }
+                @foreach (var a in items)
+                {
+                    <option value="@a.Id">
+                        @a.Title @(a.Status == "Published" ? "✓" : "")
+                    </option>
+                }
             }
         </select>
     </div>
 </div>
 
+<!-- Step Flow Navigator -->
+<div class="lms-step-flow">
+    <a class="step completed" href="assignments">
+        <i class="bi bi-check-circle-fill"></i> 1. Tạo Bài Tập
+    </a>
+    <div class="step-divider"></div>
+    <a class="step active" href="assignment-detail">
+        <i class="bi bi-file-earmark-text"></i> 2. Cấu Hình Rubric
+    </a>
+    <div class="step-divider"></div>
+    <a class="step" href="assignment-submit">
+        <i class="bi bi-upload"></i> 3. Nộp Bài
+    </a>
+    <div class="step-divider"></div>
+    <a class="step" href="assignment-result">
+        <i class="bi bi-clipboard-check"></i> 4. Kết Quả
+    </a>
+</div>
+
 @if (current is not null)
 {
-    <div class="row g-4">
-        <!-- Cột Trái: Thông tin đề bài & Hạn nộp -->
+    <div class="row g-4 fade-in">
+        <!-- Left Column: Assignment Content -->
         <div class="col-lg-6">
-            <div class="lms-card p-4 h-100">
-                <h5 class="fw-bold mb-3"><i class="bi bi-file-earmark-text text-primary me-2"></i>Nội dung Đề Bài</h5>
+            <div class="lms-card p-4 h-100 d-flex flex-column">
+                <div class="lms-section-header">
+                    <i class="bi bi-file-earmark-text"></i>
+                    <div>
+                        <h5>Nội Dung Đề Bài</h5>
+                        <div class="section-subtitle">Sử dụng Markdown để format nội dung.</div>
+                    </div>
+                </div>
+
+                <!-- Title Display -->
+                <div class="mb-3 p-3 rounded-3" style="background: var(--lms-primary-light);">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-bookmark-fill" style="color: var(--lms-primary);"></i>
+                        <span class="fw-bold" style="color: var(--lms-primary-dark);">@current.Title</span>
+                    </div>
+                </div>
+
+                <!-- Due Date -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold text-muted small text-uppercase">Hạn Nộp</label>
-                    <input type="date" class="form-control lms-input" @bind="dueDate" style="max-width:250px" />
+                    <label class="lms-label"><i class="bi bi-calendar-event"></i> Hạn nộp bài</label>
+                    <input type="date" class="form-control lms-input" @bind="dueDate" style="max-width: 260px" id="input-duedate" />
                 </div>
+
+                <!-- Max Characters -->
+                <div class="mb-3">
+                    <label class="lms-label"><i class="bi bi-text-paragraph"></i> Giới hạn ký tự bài nộp</label>
+                    <input type="number" class="form-control lms-input" @bind="current.MaxChars" style="max-width: 180px" 
+                           min="100" max="50000" id="input-maxchars" />
+                    <div class="form-text small text-muted mt-1">Mặc định: 20,000 ký tự. Tối đa: 50,000.</div>
+                </div>
+
+                <!-- Markdown Content -->
                 <div class="mb-3 flex-grow-1 d-flex flex-column">
-                    <label class="form-label fw-bold text-muted small text-uppercase">Đề bài (Hỗ trợ Markdown)</label>
-                    <textarea class="form-control lms-focus-textarea flex-grow-1" rows="12" placeholder="Nhập đề bài chi tiết..." @bind="current.PromptMarkdown"></textarea>
+                    <label class="lms-label"><i class="bi bi-markdown"></i> Đề bài chi tiết</label>
+                    <textarea class="form-control lms-focus-textarea flex-grow-1" rows="14"
+                              placeholder="## Yêu cầu bài tập&#10;&#10;Mô tả chi tiết yêu cầu bài tập ở đây...&#10;&#10;### Tiêu chí đánh giá&#10;- Nội dung đầy đủ, logic&#10;- Trình bày rõ ràng&#10;- Tham khảo tài liệu phù hợp"
+                              @bind="current.PromptMarkdown" id="textarea-prompt"></textarea>
                 </div>
-                <div class="text-end mt-auto">
-                    <button class="btn lms-btn-primary" @onclick="SavePrompt">
+
+                <!-- Save Button -->
+                <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
+                    <div>
+                        @if (showSaveSuccess)
+                        {
+                            <span class="lms-toast lms-toast-success">
+                                <i class="bi bi-check-circle-fill"></i> Đã lưu thành công
+                            </span>
+                        }
+                    </div>
+                    <button class="btn lms-btn-primary" @onclick="SavePrompt" id="btn-save-prompt">
                         <i class="bi bi-save me-1"></i> Lưu Thông Tin
                     </button>
-                    @if (showSaveSuccess)
-                    {
-                        <span class="text-success ms-2 fw-bold animate__animated animate__fadeIn"><i class="bi bi-check-circle"></i> Đã lưu</span>
-                    }
                 </div>
             </div>
         </div>
 
-        <!-- Cột Phải: Rubric -->
+        <!-- Right Column: Rubric Configuration -->
         <div class="col-lg-6">
             <div class="lms-card p-4 h-100 d-flex flex-column">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-primary me-2"></i>Tiêu Chí Chấm Điểm (Rubric)</h5>
-                </div>
-                
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between small fw-bold mb-1">
-                        <span class="text-muted">Tổng tỷ trọng</span>
-                        <span class="@(TotalWeight == 100 ? "text-success" : "text-danger")">@TotalWeight% / 100%</span>
+                <div class="lms-section-header">
+                    <i class="bi bi-list-check"></i>
+                    <div>
+                        <h5>Tiêu Chí Chấm Điểm (Rubric)</h5>
+                        <div class="section-subtitle">Tổng tỷ trọng phải bằng 100% để xuất bản.</div>
                     </div>
-                    <div class="progress" style="height: 10px;">
-                        <div class="progress-bar @(TotalWeight == 100 ? "bg-success" : (TotalWeight > 100 ? "bg-danger" : "bg-warning"))" 
-                             role="progressbar" 
-                             style="width: @(TotalWeight > 100 ? 100 : TotalWeight)%" 
-                             aria-valuenow="@TotalWeight" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                    @if(TotalWeight != 100)
-                    {
-                        <div class="small text-danger mt-1"><i class="bi bi-exclamation-triangle"></i> Tổng tỷ trọng phải đúng bằng 100%.</div>
-                    }
                 </div>
 
-                <div class="table-responsive flex-grow-1 mb-3">
-                    <table class="table lms-table">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="ps-3">Tiêu chí</th>
-                                <th>Tỷ trọng %</th>
-                                <th>Điểm tối đa</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (criteria != null && criteria.Any())
+                <!-- Weight Progress -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-bold text-muted">Tổng tỷ trọng</span>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="fw-bold @(TotalWeight == 100 ? "text-success" : (TotalWeight > 100 ? "text-danger" : ""))">
+                                @TotalWeight% / 100%
+                            </span>
+                            @if (current.Status == "Draft")
                             {
-                                @foreach (var c in criteria)
-                                {
-                                    <tr>
-                                        <td class="ps-3 fw-bold">@c.Name</td>
-                                        <td><span class="badge bg-secondary">@c.Weight%</span></td>
-                                        <td>@c.MaxScore đ</td>
-                                    </tr>
-                                }
+                                <button class="btn btn-sm lms-btn-success"
+                                        disabled="@(TotalWeight != 100 || criteria == null || !criteria.Any())"
+                                        @onclick="PublishAssignment"
+                                        id="btn-publish">
+                                    <i class="bi bi-rocket-takeoff me-1"></i> Xuất Bản
+                                </button>
                             }
                             else
                             {
-                                <tr>
-                                    <td colspan="3" class="text-center py-4 text-muted fst-italic">Chưa có tiêu chí nào.</td>
-                                </tr>
+                                <span class="lms-badge lms-badge-success">
+                                    <i class="bi bi-check-circle-fill"></i> Đã xuất bản
+                                </span>
                             }
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Thêm tiêu chí form -->
-                <div class="p-3 bg-light rounded-3 border">
-                    <h6 class="fw-bold mb-3 small text-uppercase text-muted">Thêm Tiêu Chí Mới</h6>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-5">
-                            <label class="form-label small mb-1">Tên tiêu chí</label>
-                            <input class="form-control form-control-sm" placeholder="VD: Sáng tạo" @bind="cName" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">Tỷ trọng (%)</label>
-                            <input type="number" class="form-control form-control-sm" placeholder="20" @bind="cWeight" />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">Điểm tối đa</label>
-                            <input type="number" class="form-control form-control-sm" placeholder="10" @bind="cMax" />
-                        </div>
-                        <div class="col-md-1 text-end">
-                            <button class="btn btn-sm btn-primary w-100 h-100" @onclick="AddCriterion">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
                         </div>
                     </div>
+                    <div class="lms-progress-bar">
+                        <div class="bar @(TotalWeight == 100 ? "bar-success" : (TotalWeight > 100 ? "bar-danger" : "bar-primary"))"
+                             style="width: @(Math.Min(TotalWeight, 100))%"></div>
+                    </div>
+                    @if (TotalWeight != 100 && criteria != null && criteria.Any())
+                    {
+                        <div class="small mt-1 @(TotalWeight > 100 ? "text-danger" : "text-muted")">
+                            <i class="bi bi-info-circle me-1"></i>
+                            @if (TotalWeight > 100)
+                            {
+                                <span>Tỷ trọng vượt quá 100%. Hãy điều chỉnh lại.</span>
+                            }
+                            else
+                            {
+                                <span>Còn thiếu @(100 - TotalWeight)% để đủ điều kiện xuất bản.</span>
+                            }
+                        </div>
+                    }
                 </div>
+
+                <!-- Criteria List -->
+                <div class="flex-grow-1 mb-3" style="max-height: 360px; overflow-y: auto;">
+                    @if (criteria != null && criteria.Any())
+                    {
+                        @foreach (var c in criteria)
+                        {
+                            <div class="rubric-criterion-card">
+                                <div>
+                                    <div class="criterion-name">@c.Name</div>
+                                </div>
+                                <div class="criterion-meta">
+                                    <span class="lms-badge lms-badge-info">@c.Weight%</span>
+                                    <span class="small text-muted fw-bold">Tối đa: @c.MaxScore đ</span>
+                                    @if (current.Status == "Draft")
+                                    {
+                                        <button class="btn btn-sm lms-btn-danger" @onclick="() => DeleteCriterion(c.Id)"
+                                                title="Xóa tiêu chí">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="lms-empty-state py-4">
+                            <div class="empty-icon"><i class="bi bi-list-check"></i></div>
+                            <h4>Chưa có tiêu chí</h4>
+                            <p>Thêm tiêu chí đánh giá để xây dựng rubric chấm điểm.</p>
+                        </div>
+                    }
+                </div>
+
+                <!-- Add Criterion Form -->
+                @if (current.Status == "Draft")
+                {
+                    <div class="p-3 rounded-3" style="background: var(--lms-background); border: 1px dashed var(--lms-border);">
+                        <div class="lms-label mb-2"><i class="bi bi-plus-circle"></i> Thêm Tiêu Chí Mới</div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label small mb-1 fw-bold">Tên tiêu chí</label>
+                                <input class="form-control form-control-sm lms-input"
+                                       placeholder="VD: Tính sáng tạo" @bind="cName" id="input-criterion-name" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1 fw-bold">Tỷ trọng (%)</label>
+                                <input type="number" class="form-control form-control-sm lms-input"
+                                       placeholder="25" @bind="cWeight" min="1" max="100" id="input-criterion-weight" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1 fw-bold">Điểm tối đa</label>
+                                <input type="number" class="form-control form-control-sm lms-input"
+                                       placeholder="10" @bind="cMax" min="1" id="input-criterion-max" />
+                            </div>
+                            <div class="col-md-1 text-end">
+                                <button class="btn btn-sm lms-btn-primary w-100" style="height: 33px;"
+                                        @onclick="AddCriterion"
+                                        disabled="@(string.IsNullOrWhiteSpace(cName) || cWeight <= 0 || cMax <= 0)"
+                                        id="btn-add-criterion">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-3 rounded-3 small text-muted" style="background: var(--lms-background);">
+                        <i class="bi bi-lock me-1"></i> 
+                        Bài tập đã xuất bản — không thể thêm/xóa tiêu chí.
+                    </div>
+                }
             </div>
         </div>
     </div>
 }
-else if(Id is not null)
+else if (Id is not null)
 {
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Đang tải...</span>
+    <!-- Loading Skeleton -->
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="lms-card p-4">
+                <div class="skeleton mb-3" style="height: 24px; width: 50%;"></div>
+                <div class="skeleton mb-3" style="height: 38px; width: 60%;"></div>
+                <div class="skeleton" style="height: 250px; width: 100%;"></div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="lms-card p-4">
+                <div class="skeleton mb-3" style="height: 24px; width: 60%;"></div>
+                <div class="skeleton mb-2" style="height: 52px; width: 100%;"></div>
+                <div class="skeleton mb-2" style="height: 52px; width: 100%;"></div>
+                <div class="skeleton" style="height: 52px; width: 100%;"></div>
+            </div>
         </div>
     </div>
 }
 else
 {
-    <div class="lms-card p-5 text-center text-muted">
-        <i class="bi bi-hand-index-thumb fs-1 d-block mb-3"></i>
-        <h4>Hãy chọn một bài tập từ menu bên trên để bắt đầu cấu hình.</h4>
+    <!-- Prompt to Select -->
+    <div class="lms-card">
+        <div class="lms-empty-state">
+            <div class="empty-icon"><i class="bi bi-hand-index-thumb"></i></div>
+            <h4>Chọn một bài tập để bắt đầu</h4>
+            <p>Sử dụng menu phía trên để chọn bài tập cần cấu hình rubric.</p>
+            <a href="assignments" class="btn lms-btn-secondary mt-2">
+                <i class="bi bi-arrow-left me-1"></i> Quay lại danh sách
+            </a>
+        </div>
     </div>
 }
 
@@ -178,7 +308,10 @@ else
         using var db = await DbFactory.CreateDbContextAsync();
         current = await db.Assignments.FindAsync(selectedId);
         dueDate = current?.DueDate;
-        criteria = await db.RubricCriteria.Where(c => c.AssignmentId == selectedId).OrderBy(c => c.OrderIndex).ToListAsync();
+        criteria = await db.RubricCriteria
+            .Where(c => c.AssignmentId == selectedId)
+            .OrderBy(c => c.OrderIndex)
+            .ToListAsync();
     }
 
     private async Task SavePrompt()
@@ -186,11 +319,13 @@ else
         if (current is null) return;
         using var db = await DbFactory.CreateDbContextAsync();
         var a = await db.Assignments.FindAsync(current.Id);
-        if (a is not null) { 
-            a.PromptMarkdown = current.PromptMarkdown; 
-            a.DueDate = dueDate; 
-            await db.SaveChangesAsync(); 
-            
+        if (a is not null)
+        {
+            a.PromptMarkdown = current.PromptMarkdown;
+            a.DueDate = dueDate;
+            a.MaxChars = current.MaxChars;
+            await db.SaveChangesAsync();
+
             showSaveSuccess = true;
             StateHasChanged();
             await Task.Delay(3000);
@@ -201,12 +336,47 @@ else
 
     private async Task AddCriterion()
     {
-        if (selectedId is null || string.IsNullOrWhiteSpace(cName) || cWeight <= 0) return;
+        if (selectedId is null || string.IsNullOrWhiteSpace(cName) || cWeight <= 0 || cMax <= 0) return;
         using var db = await DbFactory.CreateDbContextAsync();
         var order = await db.RubricCriteria.CountAsync(c => c.AssignmentId == selectedId) + 1;
-        db.RubricCriteria.Add(new RubricCriterion { Id = Guid.NewGuid(), AssignmentId = selectedId.Value, Name = cName.Trim(), Weight = cWeight, MaxScore = cMax, OrderIndex = order });
+        db.RubricCriteria.Add(new RubricCriterion
+        {
+            Id = Guid.NewGuid(),
+            AssignmentId = selectedId.Value,
+            Name = cName.Trim(),
+            Weight = cWeight,
+            MaxScore = cMax,
+            OrderIndex = order
+        });
         await db.SaveChangesAsync();
         cName = ""; cWeight = 0; cMax = 0;
         await LoadCurrent();
+    }
+
+    private async Task DeleteCriterion(Guid criterionId)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var c = await db.RubricCriteria.FindAsync(criterionId);
+        if (c is not null)
+        {
+            db.RubricCriteria.Remove(c);
+            await db.SaveChangesAsync();
+            await LoadCurrent();
+        }
+    }
+
+    private async Task PublishAssignment()
+    {
+        if (current is null || TotalWeight != 100) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var a = await db.Assignments.FindAsync(current.Id);
+        if (a is not null)
+        {
+            a.Status = "Published";
+            await db.SaveChangesAsync();
+            current.Status = "Published";
+            // Refresh list
+            items = await db.Assignments.OrderBy(x => x.Title).ToListAsync();
+        }
     }
 }

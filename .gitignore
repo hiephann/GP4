@@ -7,3 +7,7 @@
 2_Requirement Traceability2.xlsx
 02_SRS_v2.pdf
 3_Design_Modeling.docx
+*.docx
+*.xlsx
+*.txt
+read_docx.py

@@ -14,13 +14,13 @@
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label">Email</label>
-                    <input class="form-control" @bind="email" placeholder="student@edunexus.vn" />
+                    <input class="form-control lms-input" @bind="email" placeholder="student@edunexus.vn" />
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Mật khẩu</label>
-                    <input type="password" class="form-control" @bind="password" />
+                    <input type="password" class="form-control lms-input" @bind="password" />
                 </div>
-                <button class="btn btn-primary" @onclick="DoLogin">Đăng nhập</button>
+                <button class="btn lms-btn-primary" @onclick="DoLogin">Đăng nhập</button>
                 <button class="btn btn-outline-danger ms-2" @onclick="GoogleLogin">
                     <span class="bi bi-google"></span> Google Login
                 </button>
@@ -41,7 +41,7 @@
         }
         else
         {
-            <table class="table table-sm table-striped">
+            <table class="table lms-table table-sm table-striped">
                 <thead><tr><th>Email</th><th>Tên</th><th>Provider</th><th>Active</th></tr></thead>
                 <tbody>
                     @foreach (var u in users)

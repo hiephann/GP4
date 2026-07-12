@@ -10,7 +10,7 @@
 
 <div class="mb-3" style="max-width:480px">
     <label class="form-label">Chọn module</label>
-    <select class="form-select" @onchange="OnModuleChanged">
+    <select class="form-select lms-input" @onchange="OnModuleChanged">
         <option value="">-- chọn --</option>
         @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
     </select>
@@ -27,7 +27,7 @@
             <p class="text-center text-muted mt-2">Thẻ @(index+1)/@cards.Count — bấm để lật. Đã thuộc: @learned</p>
             <div class="d-flex justify-content-center gap-2">
                 <button class="btn btn-outline-danger" @onclick="() => Next(false)">Chưa thuộc</button>
-                <button class="btn btn-success" @onclick="() => Next(true)">Đã thuộc</button>
+                <button class="btn lms-btn-success" @onclick="() => Next(true)">Đã thuộc</button>
             </div>
         </div>
     </div>

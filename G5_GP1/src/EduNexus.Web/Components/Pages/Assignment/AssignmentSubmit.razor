@@ -1,55 +1,163 @@
 @page "/assignment-submit"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Assignment Submit - Nộp Bài</PageTitle>
+<PageTitle>Nộp Bài Tập — EduNexus</PageTitle>
 
-<div class="page-header text-center mb-4">
+<!-- Page Header -->
+<div class="page-header text-center mb-3">
     <h2>Nộp Bài Tập <span class="screen-tag">Assignment · FT-08</span></h2>
-    <p class="text-muted">Khu vực làm bài tập trung. Hệ thống sẽ tự động gửi cho AI đánh giá sơ bộ.</p>
+    <p class="text-muted mb-0">Viết và nộp bài làm của bạn. Hệ thống sẽ tự động chấm điểm sơ bộ bằng AI.</p>
+</div>
+
+<!-- Step Flow Navigator -->
+<div class="lms-step-flow">
+    <a class="step completed" href="assignments">
+        <i class="bi bi-check-circle-fill"></i> 1. Tạo Bài Tập
+    </a>
+    <div class="step-divider"></div>
+    <a class="step completed" href="assignment-detail">
+        <i class="bi bi-check-circle-fill"></i> 2. Cấu Hình Rubric
+    </a>
+    <div class="step-divider"></div>
+    <a class="step active" href="assignment-submit">
+        <i class="bi bi-upload"></i> 3. Nộp Bài
+    </a>
+    <div class="step-divider"></div>
+    <a class="step" href="assignment-result">
+        <i class="bi bi-clipboard-check"></i> 4. Kết Quả
+    </a>
 </div>
 
 <div class="row justify-content-center">
     <div class="col-lg-10">
-        <div class="lms-card p-4 mb-4">
+        <!-- Selection Panel -->
+        <div class="lms-card p-4 mb-4 fade-in">
+            <div class="lms-section-header">
+                <i class="bi bi-sliders"></i>
+                <div>
+                    <h5>Chọn Bài Tập & Học Viên</h5>
+                    <div class="section-subtitle">Chọn bài tập đã xuất bản và tài khoản học viên.</div>
+                </div>
+            </div>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label fw-bold text-muted small text-uppercase">Bài tập</label>
-                    <select class="form-select lms-input" @bind="assignmentId">
-                        <option value="">-- Chọn bài tập --</option>
-                        @if (items is not null) { @foreach (var a in items) { <option value="@a.Id">@a.Title</option> } }
+                    <label class="lms-label"><i class="bi bi-file-earmark-text"></i> Bài tập</label>
+                    <select class="form-select lms-input" @bind="assignmentId" @bind:after="OnAssignmentChanged" id="select-assignment">
+                        <option value="">— Chọn bài tập (Published) —</option>
+                        @if (items is not null)
+                        {
+                            @foreach (var a in items)
+                            {
+                                <option value="@a.Id">@a.Title</option>
+                            }
+                        }
                     </select>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label fw-bold text-muted small text-uppercase">Học viên (Mô phỏng login)</label>
-                    <select class="form-select lms-input" @bind="studentId">
-                        <option value="">-- Chọn học viên --</option>
-                        @if (students is not null) { @foreach (var s in students) { <option value="@s.Id">@s.DisplayName</option> } }
+                    <label class="lms-label"><i class="bi bi-person"></i> Học viên (mô phỏng đăng nhập)</label>
+                    <select class="form-select lms-input" @bind="studentId" id="select-student">
+                        <option value="">— Chọn học viên —</option>
+                        @if (students is not null)
+                        {
+                            @foreach (var s in students)
+                            {
+                                <option value="@s.Id">@s.DisplayName (@s.Email)</option>
+                            }
+                        }
                     </select>
                 </div>
             </div>
         </div>
 
-        <div class="lms-card p-4">
-            <div class="d-flex justify-content-between align-items-end mb-2">
-                <label class="form-label fw-bold fs-5 mb-0"><i class="bi bi-journal-text text-primary me-2"></i>Bài Làm Của Bạn</label>
-                <span class="small fw-bold @(content.Length > 20000 ? "text-danger" : "text-muted")">
-                    @content.Length / 20,000 ký tự
+        <!-- Assignment Info Card -->
+        @if (selectedAssignment is not null)
+        {
+            <div class="lms-card p-4 mb-4 fade-in border-left-primary">
+                <div class="lms-section-header">
+                    <i class="bi bi-info-circle"></i>
+                    <div>
+                        <h5>Thông Tin Bài Tập</h5>
+                        <div class="section-subtitle">Đọc kỹ yêu cầu trước khi nộp bài.</div>
+                    </div>
+                </div>
+                
+                <div class="submission-info-strip">
+                    <div class="info-item">
+                        <i class="bi bi-bookmark-fill" style="color: var(--lms-primary);"></i>
+                        <span class="info-label">Tên:</span>
+                        <span class="info-value">@selectedAssignment.Title</span>
+                    </div>
+                    @if (selectedAssignment.DueDate.HasValue)
+                    {
+                        var isOverdue = selectedAssignment.DueDate.Value < DateTime.UtcNow;
+                        <div class="info-item">
+                            <i class="bi bi-calendar-event @(isOverdue ? "text-danger" : "")" style="@(!isOverdue ? "color: var(--lms-success);" : "")"></i>
+                            <span class="info-label">Hạn nộp:</span>
+                            <span class="info-value @(isOverdue ? "text-danger" : "")">
+                                @selectedAssignment.DueDate.Value.ToString("dd/MM/yyyy")
+                                @if (isOverdue) { <span class="ms-1 lms-badge lms-badge-danger">Quá hạn</span> }
+                            </span>
+                        </div>
+                    }
+                    <div class="info-item">
+                        <i class="bi bi-text-paragraph" style="color: var(--lms-info);"></i>
+                        <span class="info-label">Giới hạn:</span>
+                        <span class="info-value">@selectedAssignment.MaxChars.ToString("N0") ký tự</span>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(selectedAssignment.PromptMarkdown))
+                {
+                    <div class="mt-3 p-3 rounded-3" style="background: var(--lms-background); border: 1px solid var(--lms-border-light);">
+                        <div class="small fw-bold text-muted text-uppercase mb-2">
+                            <i class="bi bi-markdown me-1"></i> Đề bài
+                        </div>
+                        <pre style="white-space: pre-wrap; font-family: inherit; margin: 0; font-size: 0.9rem; line-height: 1.7; color: var(--lms-text-main);">@selectedAssignment.PromptMarkdown</pre>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Writing Area -->
+        <div class="lms-card p-4 fade-in">
+            <div class="d-flex justify-content-between align-items-end mb-3">
+                <div class="lms-section-header mb-0 pb-0" style="border: none;">
+                    <i class="bi bi-journal-text"></i>
+                    <div>
+                        <h5>Bài Làm Của Bạn</h5>
+                        <div class="section-subtitle">Trình bày bài làm rõ ràng, logic và đầy đủ.</div>
+                    </div>
+                </div>
+                <span class="char-counter @CharCounterClass">
+                    <i class="bi bi-body-text me-1"></i>
+                    @content.Length / @maxChars.ToString("N0") ký tự
                 </span>
             </div>
-            
-            <textarea class="form-control lms-focus-textarea mb-4" rows="15" maxlength="20000" 
-                      placeholder="Nhập nội dung bài làm của bạn tại đây..." 
-                      @bind="content" @bind:event="oninput"></textarea>
-            
+
+            <textarea class="form-control lms-focus-textarea mb-4" rows="16"
+                      maxlength="@maxChars"
+                      placeholder="Nhập nội dung bài làm của bạn tại đây...&#10;&#10;Hãy trình bày rõ ràng, có dẫn chứng và phân tích logic."
+                      @bind="content" @bind:event="oninput" id="textarea-content"></textarea>
+
+            <!-- Character usage bar -->
+            <div class="lms-progress-bar mb-4">
+                <div class="bar @CharBarClass" style="width: @CharPercent%"></div>
+            </div>
+
+            <!-- Action Footer -->
             <div class="d-flex justify-content-between align-items-center">
-                <div class="text-muted small">
-                    <i class="bi bi-info-circle me-1"></i> Không nộp quá 1 lần (NAC-08-b).
+                <div class="d-flex align-items-center gap-3">
+                    <div class="text-muted small">
+                        <i class="bi bi-info-circle me-1"></i> Mỗi học viên chỉ được nộp <strong>1 lần</strong> (NAC-08-b).
+                    </div>
                 </div>
-                <button class="btn lms-btn-primary btn-lg px-5" @onclick="Submit" disabled="@isSubmitting">
-                    @if(isSubmitting)
+                <button class="btn lms-btn-primary btn-lg px-5" @onclick="Submit"
+                        disabled="@(isSubmitting || string.IsNullOrWhiteSpace(content))"
+                        id="btn-submit">
+                    @if (isSubmitting)
                     {
                         <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Đang nộp...</span>
+                        <span>Đang xử lý AI...</span>
                     }
                     else
                     {
@@ -58,12 +166,21 @@
                 </button>
             </div>
 
-            @if (message is not null) 
-            { 
-                <div class="alert @(ok ? "alert-success" : "alert-danger") mt-4 d-flex align-items-center">
-                    <i class="bi @(ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") fs-4 me-3"></i>
-                    <div>@message</div>
-                </div> 
+            @if (message is not null)
+            {
+                <div class="alert @(ok ? "alert-success" : "alert-danger") mt-4 d-flex align-items-start gap-3 slide-up" role="alert">
+                    <i class="bi @(ok ? "bi-check-circle-fill text-success" : "bi-exclamation-triangle-fill text-danger") fs-4"></i>
+                    <div>
+                        <div class="fw-bold mb-1">@(ok ? "Nộp bài thành công!" : "Không thể nộp bài")</div>
+                        <div class="small">@message</div>
+                        @if (ok)
+                        {
+                            <a href="assignment-result" class="btn btn-sm lms-btn-success mt-2">
+                                <i class="bi bi-bar-chart me-1"></i> Xem Kết Quả
+                            </a>
+                        }
+                    </div>
+                </div>
             }
         </div>
     </div>
@@ -72,52 +189,131 @@
 @code {
     private List<AssignmentItem>? items;
     private List<User>? students;
+    private AssignmentItem? selectedAssignment;
     private string? assignmentId, studentId;
     private string content = "";
     private string? message;
     private bool ok;
     private bool isSubmitting = false;
+    private int maxChars = 20000;
+
+    private double CharPercent => maxChars > 0 ? Math.Min((double)content.Length / maxChars * 100, 100) : 0;
+    private string CharCounterClass => content.Length > maxChars * 0.9 ? "danger" 
+                                     : content.Length > maxChars * 0.7 ? "warning" 
+                                     : "normal";
+    private string CharBarClass => content.Length > maxChars * 0.9 ? "bar-danger" 
+                                 : content.Length > maxChars * 0.7 ? "bar-warning" 
+                                 : "bar-primary";
 
     protected override async Task OnInitializedAsync()
     {
         using var db = await DbFactory.CreateDbContextAsync();
-        items = await db.Assignments.OrderBy(a => a.Title).ToListAsync();
+        // Only show Published assignments
+        items = await db.Assignments
+            .Where(a => a.Status == "Published")
+            .OrderBy(a => a.Title)
+            .ToListAsync();
         students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+    }
+
+    private void OnAssignmentChanged()
+    {
+        if (Guid.TryParse(assignmentId, out var aid))
+        {
+            selectedAssignment = items?.FirstOrDefault(a => a.Id == aid);
+            maxChars = selectedAssignment?.MaxChars ?? 20000;
+        }
+        else
+        {
+            selectedAssignment = null;
+            maxChars = 20000;
+        }
+        message = null;
     }
 
     private async Task Submit()
     {
         if (!Guid.TryParse(assignmentId, out var aid) || !Guid.TryParse(studentId, out var sid))
-        { ok = false; message = "Vui lòng chọn bài tập và học viên trước khi nộp."; return; }
-        if (string.IsNullOrWhiteSpace(content)) { ok = false; message = "Bài nộp rỗng bị từ chối (NAC-08-d)."; return; }
+        {
+            ok = false;
+            message = "Vui lòng chọn bài tập và học viên trước khi nộp.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            ok = false;
+            message = "Bài nộp không được để trống (NAC-08-d).";
+            return;
+        }
 
         isSubmitting = true;
         StateHasChanged();
-        
-        // Mô phỏng network delay
-        await Task.Delay(800);
+
+        // Simulate AI processing delay
+        await Task.Delay(2000);
 
         using var db = await DbFactory.CreateDbContextAsync();
         if (await db.Submissions.AnyAsync(s => s.AssignmentId == aid && s.StudentId == sid))
-        { 
-            ok = false; message = "Bạn đã nộp bài tập này rồi — không thể nộp lần 2 (NAC-08-b)."; 
+        {
+            ok = false;
+            message = "Bạn đã nộp bài tập này rồi — không thể nộp lần 2 (NAC-08-b).";
             isSubmitting = false;
-            return; 
+            return;
         }
 
-        db.Submissions.Add(new Submission
+        var newSubmission = new Submission
         {
             Id = Guid.NewGuid(),
             AssignmentId = aid,
             StudentId = sid,
             ContentText = content,
             SubmittedAt = DateTime.UtcNow,
-            Status = "Submitted"
-        });
+            Status = "AiGraded"
+        };
+        db.Submissions.Add(newSubmission);
+
+        // --- Mock AI Grading Logic ---
+        var criteria = await db.RubricCriteria
+            .Where(c => c.AssignmentId == aid)
+            .ToListAsync();
+        decimal totalAiScore = 0;
+        var rnd = new Random();
+
+        foreach (var c in criteria)
+        {
+            // AI scores between 60–100% of MaxScore per criterion
+            decimal rawScore = (decimal)(rnd.NextDouble() * 0.4 + 0.6) * c.MaxScore;
+            decimal aiScore = Math.Round(rawScore, 1);
+            totalAiScore += aiScore;
+
+            db.SubmissionCriterionScores.Add(new SubmissionCriterionScore
+            {
+                Id = Guid.NewGuid(),
+                SubmissionId = newSubmission.Id,
+                CriterionId = c.Id,
+                AiScore = aiScore,
+                Comment = GenerateAiFeedback(c.Name, aiScore, c.MaxScore)
+            });
+        }
+        newSubmission.AiTotalScore = totalAiScore;
+
         await db.SaveChangesAsync();
         content = "";
-        ok = true; 
-        message = "Nộp bài thành công! Hệ thống đã ghi nhận và AI đang tiến hành chấm điểm sơ bộ.";
+        ok = true;
+        message = $"AI đã tự động chấm điểm sơ bộ: {totalAiScore:0.#} điểm. Giáo viên sẽ xác nhận kết quả cuối cùng.";
         isSubmitting = false;
+    }
+
+    /// <summary>
+    /// Generate more realistic AI mock feedback per criterion
+    /// </summary>
+    private string GenerateAiFeedback(string criterionName, decimal score, decimal maxScore)
+    {
+        var ratio = maxScore > 0 ? score / maxScore : 0;
+        if (ratio >= 0.9m)
+            return $"Xuất sắc — Bài làm thể hiện rất tốt tiêu chí \"{criterionName}\". Lập luận chặt chẽ, có dẫn chứng rõ ràng.";
+        if (ratio >= 0.75m)
+            return $"Tốt — Tiêu chí \"{criterionName}\" được đáp ứng khá đầy đủ. Cần bổ sung thêm phân tích sâu hơn ở một số điểm.";
+        return $"Trung bình — Tiêu chí \"{criterionName}\" chưa được khai thác triệt để. Nên cải thiện phần lập luận và dẫn chứng.";
     }
 }

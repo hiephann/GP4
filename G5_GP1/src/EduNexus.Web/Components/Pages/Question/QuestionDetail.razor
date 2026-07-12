@@ -13,23 +13,23 @@
     <div class="card-body">
         <div class="mb-2">
             <label class="form-label">Module</label>
-            <select class="form-select" @bind="moduleId">
+            <select class="form-select lms-input" @bind="moduleId">
                 <option value="">-- chọn module --</option>
                 @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
             </select>
         </div>
         <div class="mb-2">
             <label class="form-label">Nội dung câu hỏi</label>
-            <textarea class="form-control" rows="2" @bind="content"></textarea>
+            <textarea class="form-control lms-input" rows="2" @bind="content"></textarea>
         </div>
         <div class="row mb-2">
             <div class="col">
                 <label class="form-label">Độ khó</label>
-                <select class="form-select" @bind="difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select>
+                <select class="form-select lms-input" @bind="difficulty"><option>Easy</option><option>Medium</option><option>Hard</option></select>
             </div>
             <div class="col">
                 <label class="form-label">Giải thích (tùy chọn)</label>
-                <input class="form-control" @bind="explanation" />
+                <input class="form-control lms-input" @bind="explanation" />
             </div>
         </div>
 
@@ -40,13 +40,13 @@
                 <div class="input-group-text">
                     <input type="radio" name="correct" checked="@opt.IsCorrect" @onchange="() => SetCorrect(opt)" />
                 </div>
-                <input class="form-control" @bind="opt.Content" placeholder="Nội dung đáp án" />
+                <input class="form-control lms-input" @bind="opt.Content" placeholder="Nội dung đáp án" />
             </div>
         }
         <button class="btn btn-sm btn-outline-secondary mb-3" @onclick="AddOption" disabled="@(options.Count>=6)">+ Đáp án</button>
 
         <div>
-            <button class="btn btn-primary" @onclick="Save">Lưu câu hỏi</button>
+            <button class="btn lms-btn-primary" @onclick="Save">Lưu câu hỏi</button>
             @if (message is not null) { <span class="ms-2 @(ok?"text-success":"text-danger")">@message</span> }
         </div>
     </div>

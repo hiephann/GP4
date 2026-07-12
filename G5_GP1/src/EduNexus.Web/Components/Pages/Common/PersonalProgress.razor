@@ -10,7 +10,7 @@
 
 <div class="mb-3" style="max-width:420px">
     <label class="form-label">Chọn học viên</label>
-    <select class="form-select" @onchange="OnStudentChanged">
+    <select class="form-select lms-input" @onchange="OnStudentChanged">
         <option value="">-- chọn --</option>
         @if (students is not null)
         {
@@ -40,7 +40,7 @@
                     @if (quizScores!.Count == 0) { <span class="text-muted">Chưa có bài quiz.</span> }
                     else
                     {
-                        <table class="table table-sm">
+                        <table class="table lms-table table-sm">
                             <thead><tr><th>Ngày</th><th>Điểm</th></tr></thead>
                             <tbody>
                                 @foreach (var q in quizScores)

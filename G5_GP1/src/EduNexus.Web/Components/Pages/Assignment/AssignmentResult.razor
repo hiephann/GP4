@@ -1,93 +1,255 @@
 @page "/assignment-result"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 
-<PageTitle>Assignment Result - Kết Quả</PageTitle>
+<PageTitle>Kết Quả Bài Tập — EduNexus</PageTitle>
 
-<div class="page-header d-flex justify-content-between align-items-end mb-4">
+<!-- Page Header -->
+<div class="page-header d-flex justify-content-between align-items-end">
     <div>
         <h2>Kết Quả Bài Tập <span class="screen-tag">Assignment · FT-08</span></h2>
-        <p class="text-muted mb-0">Xem chi tiết đánh giá từ AI và phản hồi của Giáo viên.</p>
+        <p class="text-muted mb-0">Xem chi tiết đánh giá AI, nhận xét từ Giáo viên và chốt điểm cuối cùng.</p>
     </div>
-    <div style="min-width: 350px;">
-        <select class="form-select lms-input" @onchange="OnChanged">
-            <option value="">-- Chọn bài nộp để xem kết quả --</option>
+    <div style="min-width: 380px;">
+        <select class="form-select lms-input" @onchange="OnChanged" id="select-submission">
+            <option value="">— Chọn bài nộp để xem kết quả —</option>
             @if (submissions is not null)
             {
-                @foreach (var s in submissions) { <option value="@s.Id">@s.Label</option> }
+                @foreach (var s in submissions)
+                {
+                    <option value="@s.Id">@s.Label</option>
+                }
             }
         </select>
     </div>
 </div>
 
+<!-- Step Flow Navigator -->
+<div class="lms-step-flow">
+    <a class="step completed" href="assignments">
+        <i class="bi bi-check-circle-fill"></i> 1. Tạo Bài Tập
+    </a>
+    <div class="step-divider"></div>
+    <a class="step completed" href="assignment-detail">
+        <i class="bi bi-check-circle-fill"></i> 2. Cấu Hình Rubric
+    </a>
+    <div class="step-divider"></div>
+    <a class="step completed" href="assignment-submit">
+        <i class="bi bi-check-circle-fill"></i> 3. Nộp Bài
+    </a>
+    <div class="step-divider"></div>
+    <a class="step active" href="assignment-result">
+        <i class="bi bi-clipboard-check"></i> 4. Kết Quả
+    </a>
+</div>
+
 @if (current is not null)
 {
-    <div class="row g-4">
-        <!-- Cột Trái: Điểm số & Trạng thái -->
+    <!-- Submission Info Strip -->
+    <div class="submission-info-strip mb-4 fade-in">
+        <div class="info-item">
+            <i class="bi bi-person-fill" style="color: var(--lms-primary);"></i>
+            <span class="info-label">Học viên:</span>
+            <span class="info-value">@studentName</span>
+        </div>
+        <div class="info-item">
+            <i class="bi bi-file-earmark-text" style="color: var(--lms-info);"></i>
+            <span class="info-label">Bài tập:</span>
+            <span class="info-value">@assignmentTitle</span>
+        </div>
+        <div class="info-item">
+            <i class="bi bi-clock" style="color: var(--lms-text-muted);"></i>
+            <span class="info-label">Nộp lúc:</span>
+            <span class="info-value">@current.SubmittedAt.ToString("dd/MM/yyyy HH:mm")</span>
+        </div>
+        <div class="info-item">
+            <i class="bi bi-body-text" style="color: var(--lms-text-muted);"></i>
+            <span class="info-label">Độ dài:</span>
+            <span class="info-value">@((current.ContentText?.Length ?? 0).ToString("N0")) ký tự</span>
+        </div>
+    </div>
+
+    <div class="row g-4 fade-in">
+        <!-- Left Column: Score & Teacher Feedback -->
         <div class="col-lg-4">
+            <!-- Score Card -->
             <div class="lms-card p-4 text-center mb-4">
-                <h5 class="fw-bold mb-4 text-muted small text-uppercase">Điểm Tổng Kết</h5>
-                
-                @if(current.FinalScore.HasValue)
+                <div class="small fw-bold text-muted text-uppercase mb-3 letter-spacing">Điểm Tổng Kết</div>
+
+                @if (current.FinalScore.HasValue)
                 {
-                    <div class="lms-score-circle mb-3 mx-auto">
+                    <div class="lms-score-circle score-confirmed mb-3">
                         @current.FinalScore.Value.ToString("0.#")
                     </div>
-                    <span class="lms-badge lms-badge-success mb-2">Đã Chốt Điểm</span>
+                    <span class="lms-badge lms-badge-success">
+                        <i class="bi bi-check-circle-fill"></i> Đã chốt điểm
+                    </span>
+                    @if (current.ConfirmedAt.HasValue)
+                    {
+                        <div class="small text-muted mt-2">
+                            <i class="bi bi-calendar-check me-1"></i>
+                            @current.ConfirmedAt.Value.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                    }
                 }
                 else
                 {
-                    <div class="lms-score-circle mb-3 mx-auto text-muted border-secondary">
-                        ?
+                    <div class="lms-score-circle score-pending mb-3">
+                        @(current.AiTotalScore.HasValue ? current.AiTotalScore.Value.ToString("0.#") : "?")
                     </div>
-                    <span class="lms-badge lms-badge-warning mb-2">Đang Chờ GV Xác Nhận</span>
+                    <span class="lms-badge lms-badge-warning">
+                        <i class="bi bi-hourglass-split"></i> Chờ GV xác nhận
+                    </span>
+                    @if (current.AiTotalScore.HasValue)
+                    {
+                        <div class="small text-muted mt-2">
+                            <i class="bi bi-robot me-1"></i> Điểm sơ bộ từ AI
+                        </div>
+                    }
                 }
-                
+
+                <!-- Status Timeline -->
                 <div class="mt-4 pt-3 border-top text-start">
-                    <p class="mb-1 text-muted small fw-bold text-uppercase">Trạng thái bài nộp</p>
-                    <p class="fw-bold">@current.Status</p>
+                    <div class="small fw-bold text-muted text-uppercase mb-2">Trạng thái</div>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="d-flex align-items-center gap-2 small">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span>Đã nộp bài</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 small">
+                            <i class="bi @(current.Status != "Submitted" ? "bi-check-circle-fill text-success" : "bi-circle text-muted")"></i>
+                            <span>AI đã chấm sơ bộ</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 small">
+                            <i class="bi @(current.Status == "Confirmed" ? "bi-check-circle-fill text-success" : "bi-circle text-muted")"></i>
+                            <span>GV xác nhận điểm</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Khung Nhận xét GV -->
-            <div class="lms-card p-4">
-                <h5 class="fw-bold mb-3"><i class="bi bi-chat-quote text-primary me-2"></i>Nhận Xét Của GV</h5>
-                @if(!string.IsNullOrEmpty(current.TeacherComment))
+            <!-- Teacher Comment Card -->
+            <div class="lms-card p-4 mb-4">
+                <div class="lms-section-header">
+                    <i class="bi bi-chat-quote"></i>
+                    <h5>Nhận Xét Của GV</h5>
+                </div>
+                @if (!string.IsNullOrEmpty(current.TeacherComment))
                 {
-                    <div class="p-3 bg-light rounded-3 border-start border-4 border-primary fst-italic">
-                        "@current.TeacherComment"
+                    <div class="p-3 rounded-3 border-left-primary" style="background: var(--lms-primary-light);">
+                        <pre style="white-space: pre-wrap; font-family: inherit; margin: 0; font-size: 0.9rem; line-height: 1.6; font-style: italic;">@current.TeacherComment</pre>
                     </div>
                 }
                 else
                 {
-                    <p class="text-muted fst-italic mb-0">Chưa có nhận xét nào.</p>
+                    <p class="text-muted fst-italic mb-0 small">Chưa có nhận xét nào từ Giáo viên.</p>
                 }
-                
-                @if (current.Status != "Confirmed")
-                {
-                    <div class="mt-4 pt-3 border-top">
-                        <div class="alert alert-warning py-2 small mb-3">
-                            <i class="bi bi-person-badge"></i> <b>Khu vực Giáo viên:</b> Chốt điểm cuối cùng.
+            </div>
+
+            <!-- Teacher Confirm Zone -->
+            @if (current.Status != "Confirmed")
+            {
+                <div class="lms-card p-4">
+                    <div class="teacher-zone">
+                        <div class="teacher-zone-header">
+                            <i class="bi bi-person-badge-fill"></i>
+                            <span>Khu Vực Giáo Viên — Chốt Điểm</span>
                         </div>
-                        <label class="form-label small fw-bold">Điểm số</label>
-                        <input type="number" class="form-control lms-input mb-2" @bind="scoreInput" placeholder="Nhập điểm..." />
-                        
-                        <label class="form-label small fw-bold">Nhận xét</label>
-                        <textarea class="form-control lms-input mb-3" @bind="commentInput" rows="2" placeholder="Nhập nhận xét của bạn..."></textarea>
-                        
-                        <button class="btn lms-btn-primary w-100" @onclick="Confirm">
-                            <i class="bi bi-check2-circle me-1"></i> Xác Nhận Điểm
+
+                        <div class="mb-3">
+                            <label class="lms-label"><i class="bi bi-123"></i> Điểm cuối cùng</label>
+                            <input type="number" class="form-control lms-input" @bind="scoreInput"
+                                   placeholder="Nhập điểm..." step="0.5" min="0" id="input-final-score" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="lms-label"><i class="bi bi-chat-left-text"></i> Nhận xét</label>
+                            <textarea class="form-control lms-input" @bind="commentInput" rows="3"
+                                      placeholder="Nhập nhận xét, góp ý cho học viên..." id="textarea-comment"></textarea>
+                        </div>
+
+                        <button class="btn lms-btn-success w-100" @onclick="Confirm" id="btn-confirm">
+                            <i class="bi bi-check2-circle me-1"></i> Xác Nhận & Chốt Điểm
                         </button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Right Column: Rubric Breakdown & Content -->
+        <div class="col-lg-8">
+            <!-- Rubric Breakdown -->
+            <div class="lms-card p-4 mb-4">
+                <div class="lms-section-header">
+                    <i class="bi bi-bar-chart-steps"></i>
+                    <div>
+                        <h5>Chi Tiết Điểm Theo Rubric</h5>
+                        <div class="section-subtitle">Đánh giá tự động từ AI cho từng tiêu chí.</div>
+                    </div>
+                </div>
+
+                @if (criterionScores != null && criterionScores.Any())
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var cs in criterionScores)
+                        {
+                            var scorePercent = cs.MaxScore > 0 ? (double)(cs.AiScore ?? 0) / (double)cs.MaxScore * 100 : 0;
+                            var barClass = scorePercent >= 80 ? "bar-success" : (scorePercent >= 60 ? "bar-warning" : "bar-danger");
+
+                            <div class="p-3 rounded-3" style="background: var(--lms-background); border: 1px solid var(--lms-border-light);">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold" style="font-size: 0.92rem;">@cs.CriterionName</span>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="lms-badge lms-badge-info">@(cs.AiScore?.ToString("0.#") ?? "—") / @cs.MaxScore</span>
+                                        <span class="small fw-bold text-muted">(@cs.Weight%)</span>
+                                    </div>
+                                </div>
+                                <div class="lms-progress-bar mb-2">
+                                    <div class="bar @barClass" style="width: @scorePercent%"></div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(cs.Comment))
+                                {
+                                    <div class="ai-feedback-card mt-2">
+                                        <div class="small" style="color: var(--lms-text-muted); line-height: 1.6;">
+                                            @cs.Comment
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Total Summary -->
+                    <div class="mt-4 p-3 rounded-3 d-flex justify-content-between align-items-center" 
+                         style="background: var(--lms-primary-light); border: 1px solid rgba(79, 70, 229, 0.15);">
+                        <span class="fw-bold" style="color: var(--lms-primary-dark);">
+                            <i class="bi bi-calculator me-1"></i> Tổng điểm AI
+                        </span>
+                        <span class="fw-bold fs-5" style="color: var(--lms-primary);">
+                            @(current.AiTotalScore?.ToString("0.#") ?? "—") điểm
+                        </span>
+                    </div>
+                }
+                else
+                {
+                    <div class="lms-empty-state py-3">
+                        <div class="empty-icon"><i class="bi bi-bar-chart"></i></div>
+                        <h4>Chưa có dữ liệu chấm điểm</h4>
+                        <p>Rubric chưa được thiết lập hoặc AI chưa hoàn tất chấm bài.</p>
                     </div>
                 }
             </div>
-        </div>
 
-        <!-- Cột Phải: Nội dung bài làm -->
-        <div class="col-lg-8">
-            <div class="lms-card p-4 h-100">
-                <h5 class="fw-bold mb-4"><i class="bi bi-journal-text text-primary me-2"></i>Nội Dung Bài Làm</h5>
-                <div class="bg-light p-4 rounded-3 border" style="min-height: 400px;">
-                    <pre style="white-space:pre-wrap; font-family: inherit;">@current.ContentText</pre>
+            <!-- Submission Content -->
+            <div class="lms-card p-4">
+                <div class="lms-section-header">
+                    <i class="bi bi-journal-text"></i>
+                    <div>
+                        <h5>Nội Dung Bài Làm</h5>
+                        <div class="section-subtitle">Bài làm gốc của học viên.</div>
+                    </div>
+                </div>
+                <div class="p-4 rounded-3" style="background: var(--lms-background); border: 1px solid var(--lms-border-light); min-height: 300px;">
+                    <pre style="white-space: pre-wrap; font-family: 'Inter', sans-serif; margin: 0; font-size: 0.92rem; line-height: 1.75; color: var(--lms-text-main);">@current.ContentText</pre>
                 </div>
             </div>
         </div>
@@ -95,19 +257,29 @@
 }
 else
 {
-    <div class="lms-card p-5 text-center text-muted mt-4">
-        <i class="bi bi-inbox fs-1 d-block mb-3"></i>
-        <h4>Chưa có bài nộp nào được chọn.</h4>
-        <p>Vui lòng chọn một bài nộp từ danh sách phía trên để xem kết quả đánh giá.</p>
+    <div class="lms-card">
+        <div class="lms-empty-state">
+            <div class="empty-icon"><i class="bi bi-clipboard-data"></i></div>
+            <h4>Chưa chọn bài nộp</h4>
+            <p>Chọn một bài nộp từ danh sách phía trên để xem kết quả đánh giá chi tiết.</p>
+            <a href="assignment-submit" class="btn lms-btn-secondary mt-2">
+                <i class="bi bi-arrow-left me-1"></i> Quay lại nộp bài
+            </a>
+        </div>
     </div>
 }
 
 @code {
     record SubOption(Guid Id, string Label);
+    record CriterionScoreDisplay(string CriterionName, decimal MaxScore, decimal Weight, decimal? AiScore, string? Comment);
+
     private List<SubOption>? submissions;
     private Submission? current;
+    private List<CriterionScoreDisplay>? criterionScores;
     private decimal scoreInput;
     private string commentInput = "";
+    private string studentName = "";
+    private string assignmentTitle = "";
 
     protected override async Task OnInitializedAsync() => await LoadList();
 
@@ -118,7 +290,8 @@ else
                              join a in db.Assignments on s.AssignmentId equals a.Id
                              join u in db.Users on s.StudentId equals u.Id
                              orderby s.SubmittedAt descending
-                             select new SubOption(s.Id, a.Title + " — " + u.DisplayName)).ToListAsync();
+                             select new SubOption(s.Id, a.Title + " — " + u.DisplayName + " (" + s.SubmittedAt.ToString("dd/MM") + ")"))
+                            .ToListAsync();
     }
 
     private async Task OnChanged(ChangeEventArgs e)
@@ -126,6 +299,27 @@ else
         if (!Guid.TryParse(e.Value?.ToString(), out var id)) { current = null; return; }
         using var db = await DbFactory.CreateDbContextAsync();
         current = await db.Submissions.FindAsync(id);
+
+        if (current != null)
+        {
+            // Load student name and assignment title
+            var student = await db.Users.FindAsync(current.StudentId);
+            studentName = student?.DisplayName ?? "—";
+            var assignment = await db.Assignments.FindAsync(current.AssignmentId);
+            assignmentTitle = assignment?.Title ?? "—";
+
+            // Load Rubric Breakdown with Weight info
+            criterionScores = await (from sc in db.SubmissionCriterionScores
+                                     join c in db.RubricCriteria on sc.CriterionId equals c.Id
+                                     where sc.SubmissionId == current.Id
+                                     orderby c.OrderIndex
+                                     select new CriterionScoreDisplay(c.Name, c.MaxScore, c.Weight, sc.AiScore, sc.Comment))
+                                    .ToListAsync();
+
+            // Set defaults for teacher form
+            scoreInput = current.FinalScore ?? current.AiTotalScore ?? 0;
+            commentInput = current.TeacherComment ?? "";
+        }
     }
 
     private async Task Confirm()
@@ -140,6 +334,8 @@ else
             s.Status = "Confirmed";
             s.ConfirmedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
+
+            // Refresh view
             current = s;
         }
     }

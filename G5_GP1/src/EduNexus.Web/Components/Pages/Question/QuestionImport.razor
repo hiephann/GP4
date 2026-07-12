@@ -16,7 +16,7 @@
     <div class="card-body">
         <div class="mb-2">
             <label class="form-label">Module</label>
-            <select class="form-select" @bind="moduleId">
+            <select class="form-select lms-input" @bind="moduleId">
                 <option value="">-- chọn module --</option>
                 @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
             </select>
@@ -24,7 +24,7 @@
         <label class="form-label">Dữ liệu (mỗi dòng 1 câu hỏi)</label>
         <textarea class="form-control mb-2" rows="6" @bind="raw"
                   placeholder="Thủ đô Việt Nam? | Hà Nội | TP.HCM | Đà Nẵng | Huế"></textarea>
-        <button class="btn btn-primary" @onclick="Import">Nhập</button>
+        <button class="btn lms-btn-primary" @onclick="Import">Nhập</button>
     </div>
 </div>
 
@@ -35,7 +35,7 @@
             Tổng: @results.Count — Thành công: <strong class="text-success">@results.Count(r => r.ok)</strong> —
             Lỗi: <strong class="text-danger">@results.Count(r => !r.ok)</strong>
         </div>
-        <table class="table table-sm">
+        <table class="table lms-table table-sm">
             <thead><tr><th>Dòng</th><th>Kết quả</th><th>Ghi chú</th></tr></thead>
             <tbody>
                 @foreach (var r in results)
