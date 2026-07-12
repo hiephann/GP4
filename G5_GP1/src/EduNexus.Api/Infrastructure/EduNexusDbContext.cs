@@ -77,6 +77,8 @@ public class EduNexusDbContext : DbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public IEnumerable<object> FlashcardProgresses { get; internal set; }
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         // Tên bảng khớp SQL script (class name khác table name ở 3 entity dưới)
