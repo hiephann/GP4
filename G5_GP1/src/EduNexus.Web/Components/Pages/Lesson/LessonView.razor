@@ -1,70 +1,196 @@
 @page "/lesson-view"
-@using LessonEntity = EduNexus.Api.Lesson.Entities.Lesson
-@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject ILessonService Lessons
 
 <PageTitle>Lesson View</PageTitle>
 
 <div class="page-header">
     <h2>Lesson View <span class="screen-tag">Lesson · FT-06</span></h2>
-    <p class="text-muted">Xem modules và nội dung lesson.</p>
+    <p class="text-muted">Học viên xem modules và nội dung bài học, đánh dấu hoàn thành.</p>
 </div>
 
-<div class="mb-3" style="max-width:480px">
-    <label class="form-label">Chọn bài học</label>
-    <select class="form-select lms-input" @onchange="OnLessonChanged">
-        <option value="">-- chọn --</option>
-        @if (lessons is not null)
-        {
-            @foreach (var l in lessons) { <option value="@l.Id">@l.Title</option> }
-        }
-    </select>
+
+<div class="lms-card p-4 mb-4">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label small text-uppercase text-muted fw-bold">Module</label>
+            <select class="form-select lms-input" @onchange="OnModuleChanged">
+                <option value="">-- chọn module --</option>
+                @foreach (var m in modules)
+                {
+                    <option value="@m.Id">@m.Display</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-uppercase text-muted fw-bold">Bài học</label>
+            <select class="form-select lms-input" @onchange="OnLessonChanged" disabled="@(lessons.Count == 0)">
+                <option value="">-- chọn bài học --</option>
+                @foreach (var l in lessons)
+                {
+                    <option value="@l.Id">@l.OrderIndex. @l.Title</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-uppercase text-muted fw-bold">Học viên (mô phỏng đăng nhập)</label>
+            <select class="form-select lms-input" @onchange="OnStudentChanged">
+                <option value="">-- chọn học viên --</option>
+                @foreach (var u in users)
+                {
+                    <option value="@u.Id">@u.DisplayName</option>
+                }
+            </select>
+        </div>
+    </div>
+
 </div>
 
-@if (current is not null)
+@if (message is not null)
 {
-    <h4>@current.Title</h4>
-    @foreach (var c in contents!)
+    <div class="alert @(ok ? "alert-success" : "alert-danger")">
+        <i class="bi @(ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i>@message
+    </div>
+}
+
+@if (lesson is not null)
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold mb-0">@lesson.Title</h4>
+
+        @if (isCompleted)
+        {
+            <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i> Đã hoàn thành</span>
+        }
+        else
+        {
+            <button class="btn lms-btn-primary" @onclick="MarkCompleted" disabled="@busy">
+                <i class="bi bi-check2-square me-2"></i> Đánh dấu hoàn thành
+            </button>
+        }
+    </div>
+
+    @foreach (var c in lesson.Contents)
     {
-        <div class="card mb-2">
-            <div class="card-body">
-                @if (c.ContentType == "Markdown")
+        <div class="lms-card p-4 mb-3">
+            @if (c.ContentType == "Markdown")
+            {
+                <MarkdownView Markdown="@c.MarkdownText" />
+            }
+            else if (c.ContentType == "YoutubeVideo")
+            {
+                @if (EmbedUrl(c.YoutubeUrl) is { } embed)
                 {
-                    <pre style="white-space:pre-wrap">@c.MarkdownText</pre>
+                    <div class="ratio ratio-16x9 mb-3">
+                        <iframe src="@embed" title="Video bài học" allowfullscreen
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"></iframe>
+                    </div>
                 }
-                else if (c.ContentType == "YoutubeVideo")
+                <a href="@c.YoutubeUrl" target="_blank"><i class="bi bi-youtube me-1"></i>@c.YoutubeUrl</a>
+
+                @if (!string.IsNullOrWhiteSpace(c.VideoSummary))
                 {
-                    <a href="@c.YoutubeUrl" target="_blank">@c.YoutubeUrl</a>
-                    @if (!string.IsNullOrEmpty(c.VideoSummary))
-                    {
-                        <div class="alert alert-light mt-2"><strong>Tóm tắt AI:</strong> @c.VideoSummary</div>
-                    }
+                    <div class="alert alert-light border mt-3 mb-0">
+                        <h6 class="fw-bold"><i class="bi bi-robot me-2"></i>Tóm tắt AI</h6>
+                        <MarkdownView Markdown="@c.VideoSummary" />
+                    </div>
                 }
-                else
-                {
-                    <span class="bi bi-paperclip"></span> @c.FileName
-                }
-            </div>
+            }
+            else
+            {
+                <a href="@(c.FileUrl ?? "#")" target="_blank">
+                    <i class="bi bi-paperclip me-1"></i>@c.FileName
+                </a>
+            }
         </div>
     }
-    @if (contents!.Count == 0) { <p class="text-muted">Bài học chưa có nội dung.</p> }
+
+    @if (!lesson.Contents.Any())
+    {
+        <p class="text-muted">Bài học chưa có nội dung.</p>
+    }
 }
 
 @code {
-    private List<LessonEntity>? lessons;
-    private LessonEntity? current;
-    private List<LessonContent>? contents;
+    private List<ModuleOptionDto> modules = new();
+    private List<LessonListItemDto> lessons = new();
+    private List<UserOptionDto> users = new();
+
+    private LessonViewDto? lesson;
+    private Guid? studentId;
+    private bool isCompleted, busy, ok;
+    private string? message;
 
     protected override async Task OnInitializedAsync()
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        lessons = await db.Lessons.OrderBy(l => l.Title).ToListAsync();
+        modules = await Lessons.GetModuleOptionsAsync();
+        users = await Lessons.GetUserOptionsAsync();
+    }
+
+    private async Task OnModuleChanged(ChangeEventArgs e)
+    {
+        lesson = null;
+        message = null;
+
+        lessons = Guid.TryParse(e.Value?.ToString(), out var moduleId)
+            ? await Lessons.GetLessonsByModuleAsync(moduleId)
+            : new();
     }
 
     private async Task OnLessonChanged(ChangeEventArgs e)
     {
-        if (!Guid.TryParse(e.Value?.ToString(), out var id)) { current = null; return; }
-        using var db = await DbFactory.CreateDbContextAsync();
-        current = await db.Lessons.FindAsync(id);
-        contents = await db.LessonContents.Where(c => c.LessonId == id).OrderBy(c => c.OrderIndex).ToListAsync();
+        message = null;
+
+        lesson = Guid.TryParse(e.Value?.ToString(), out var lessonId)
+            ? await Lessons.GetForViewAsync(lessonId)
+            : null;
+
+        await RefreshCompletion();
+    }
+
+    private async Task OnStudentChanged(ChangeEventArgs e)
+    {
+        studentId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await RefreshCompletion();
+    }
+
+    private async Task RefreshCompletion()
+        => isCompleted = lesson is not null && studentId is not null
+            && await Lessons.IsCompletedAsync(lesson.Id, studentId.Value);
+
+    private async Task MarkCompleted()
+    {
+        if (busy) return;
+        busy = true;
+        message = null;
+
+        try
+        {
+            await Lessons.MarkCompletedAsync(lesson!.Id, studentId ?? Guid.Empty);
+            isCompleted = true;
+            ok = true;
+            message = "Đã ghi nhận hoàn thành bài học (LessonProgress — FT-12).";
+        }
+        catch (LessonValidationException ex)
+        {
+            ok = false;
+            message = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    /// <summary>Đổi link YouTube thường sang dạng /embed để nhúng iframe.</summary>
+    private static string? EmbedUrl(string? youtubeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(youtubeUrl) || !Uri.TryCreate(youtubeUrl, UriKind.Absolute, out var uri))
+            return null;
+
+        var id = uri.Host.Contains("youtu.be", StringComparison.OrdinalIgnoreCase)
+            ? uri.AbsolutePath.Trim('/')
+            : System.Web.HttpUtility.ParseQueryString(uri.Query)["v"];
+
+        return string.IsNullOrEmpty(id) ? null : $"https://www.youtube.com/embed/{id}";
     }
 }

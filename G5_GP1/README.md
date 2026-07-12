@@ -55,8 +55,11 @@ G5_GP1/
    └─ Quiz/        ...
 ```
 
-> Mỗi feature có đủ 5 lớp. Phần thân phương thức nghiệp vụ để `NotImplementedException()`
-> kèm `// TODO` (đúng yêu cầu "chưa cần chi tiết"); CRUD cơ bản nằm ở `EfRepository<T>`.
+> Mỗi feature có đủ 5 lớp; CRUD cơ bản nằm ở `EfRepository<T>`.
+>
+> **Trạng thái (GP6):** feature **Lesson** đã hoàn thiện — Blazor → `ILessonService` → `ILessonRepository` → EF Core,
+> tích hợp GenAI (Gemini) và YouTube. Xem `docs/GP6_Traceability_Lesson.md`.
+> Các feature còn lại vẫn để `NotImplementedException()` kèm `// TODO`.
 
 ## 1) Tạo database
 
@@ -64,12 +67,30 @@ Mở SQL Server (localhost) rồi chạy script:
 
 ```bash
 sqlcmd -S localhost -i database/EduNexus_CreateDatabase.sql
+sqlcmd -S localhost -i database/EduNexus_DemoData.sql      # demo data (nhóm Lesson)
 ```
 
-Hoặc mở `database/EduNexus_CreateDatabase.sql` bằng SSMS và **Execute**.
-Script sẽ tạo database `EduNexus` và toàn bộ bảng (Auth, Course/Module/Lesson,
+Hoặc mở 2 file `.sql` bằng SSMS và **Execute** theo thứ tự trên.
+Script đầu tạo database `EduNexus` và toàn bộ bảng (Auth, Course/Module/Lesson,
 Question, Flashcard, Assignment, Quiz, Class, Catalog/Payment, Progress/Log/Notification)
-cùng seed bảng `Roles`.
+cùng seed bảng `Roles`. Script thứ hai nạp dữ liệu demo (chạy lại nhiều lần vẫn an toàn).
+
+## 1b) Cấu hình GenAI (tùy chọn)
+
+Các màn hình Lesson dùng **Google Gemini** để sinh nội dung bài giảng và tóm tắt video.
+Điền key vào `src/EduNexus.Web/appsettings.Development.json` (**không commit key**):
+
+```jsonc
+{
+  "Ai": {
+    "Gemini":  { "ApiKey": "<https://aistudio.google.com/apikey>" },
+    "Youtube": { "ApiKey": "<YouTube Data API v3 — Google Cloud Console>" }
+  }
+}
+```
+
+**Bỏ trống cũng chạy được**: hệ thống tự dùng `FakeAiContentService` sinh nội dung mẫu,
+còn Lesson Text Extract sẽ chuyển sang nhánh dán transcript thủ công.
 
 ## 2) Chạy API
 

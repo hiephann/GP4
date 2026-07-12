@@ -5,6 +5,7 @@ using EduNexus.Api.Common.Services;
 using EduNexus.Api.Flashcard.Repositories;
 using EduNexus.Api.Flashcard.Services;
 using EduNexus.Api.Infrastructure;
+using EduNexus.Api.Infrastructure.Ai;
 using EduNexus.Api.Lesson.Repositories;
 using EduNexus.Api.Lesson.Services;
 using EduNexus.Api.Question.Repositories;
@@ -27,6 +28,9 @@ builder.Services.AddDbContext<EduNexusDbContext>(options =>
                 maxRetryDelay: TimeSpan.FromSeconds(30),
                 errorNumbersToAdd: null);
         }));
+
+// ----- GenAI (Gemini, fallback mock) + YouTube transcript -----
+builder.Services.AddEduNexusAi(builder.Configuration);
 
 // ----- Repositories -----
 builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
@@ -56,7 +60,7 @@ builder.Services.AddScoped<IQuestionService, QuestionService>();
 builder.Services.AddScoped<IQuizService, QuizService>();
 
 // ----- MVC + Swagger -----
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<DomainExceptionFilter>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

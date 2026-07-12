@@ -1,150 +1,247 @@
 @page "/lesson-editor"
-@using LessonEntity = EduNexus.Api.Lesson.Entities.Lesson
-@inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject ILessonService Lessons
 
 <PageTitle>Lesson Editor</PageTitle>
 
 <div class="page-header">
     <h2>Lesson Editor <span class="screen-tag">Lesson · FT-02</span></h2>
-    <p class="text-muted">Soạn nội dung bài học (video, markdown, tài liệu đính kèm).</p>
+    <p class="text-muted">Soạn nội dung bài học (markdown, video YouTube, tài liệu đính kèm).</p>
 </div>
 
-<div class="mb-3" style="max-width:480px">
-    <label class="form-label">Chọn module</label>
+
+<div class="mb-3" style="max-width:520px">
+    <label class="form-label fw-bold text-muted small text-uppercase">Chọn module</label>
     <select class="form-select lms-input" @onchange="OnModuleChanged">
-        <option value="">-- chọn --</option>
-        @if (modules is not null)
+        <option value="">-- chọn module --</option>
+        @foreach (var m in modules)
+
         {
-            @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> }
+            <option value="@m.Id">@m.Display</option>
         }
     </select>
 </div>
 
-@if (selectedModule is not null)
+@if (message is not null)
 {
-    <div class="row">
+    <div class="alert @(ok ? "alert-success" : "alert-danger") d-flex align-items-center">
+        <i class="bi @(ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") fs-5 me-2"></i>
+        <div>@message</div>
+    </div>
+}
+
+@if (selectedModuleId is not null)
+{
+    <div class="row g-3">
         <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">Bài học</div>
+            <div class="lms-card">
+                <div class="card-header bg-transparent fw-bold">Bài học trong module</div>
                 <div class="list-group list-group-flush">
-                    @foreach (var l in lessons!)
+                    @foreach (var l in lessons)
                     {
-                        <button class="list-group-item list-group-item-action @(l.Id==currentLesson?.Id ? "active":"")"
-                                @onclick="() => SelectLesson(l)">@l.Title</button>
+                        <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(l.Id == currentLessonId ? "active" : "")"
+                                @onclick="() => SelectLesson(l.Id)">
+                            <span>@l.OrderIndex. @l.Title</span>
+                            <span class="badge bg-secondary">@l.ContentCount</span>
+                        </button>
+                    }
+                    @if (lessons.Count == 0)
+                    {
+                        <div class="list-group-item text-muted">Module chưa có bài học nào.</div>
                     }
                 </div>
                 <div class="card-body d-flex gap-2">
-                    <input class="form-control form-control-sm" @bind="newLessonTitle" placeholder="Tên bài mới" />
-                    <button class="btn btn-sm lms-btn-primary" @onclick="AddLesson">+</button>
+
+                    <input class="form-control form-control-sm lms-input" @bind="newLessonTitle" placeholder="Tên bài học mới" />
+                    <button class="btn btn-sm lms-btn-primary" @onclick="AddLesson" disabled="@busy">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+
                 </div>
             </div>
         </div>
+
         <div class="col-md-8">
-            @if (currentLesson is not null)
+            @if (currentLessonId is not null)
             {
-                <div class="card">
-                    <div class="card-header">Nội dung: @currentLesson.Title</div>
-                    <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label">Loại nội dung</label>
-                            <select class="form-select lms-input" @bind="contentType">
-                                <option>Markdown</option>
-                                <option>YoutubeVideo</option>
-                                <option>File</option>
-                            </select>
-                        </div>
-                        @if (contentType == "Markdown")
-                        {
-                            <textarea class="form-control lms-input" rows="6" @bind="markdown" placeholder="# Nội dung markdown..."></textarea>
-                        }
-                        else if (contentType == "YoutubeVideo")
-                        {
-                            <input class="form-control lms-input" @bind="youtubeUrl" placeholder="https://youtube.com/watch?v=..." />
-                        }
-                        else
-                        {
-                            <input class="form-control lms-input" @bind="fileName" placeholder="Tên tệp (PDF/Word/ZIP)" />
-                        }
-                        <button class="btn lms-btn-primary mt-2" @onclick="SaveContent">Lưu nội dung</button>
-                    </div>
+
+                <div class="lms-card p-4 mb-3">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-pencil-square text-primary me-2"></i>Thêm nội dung</h6>
+
+                    <label class="form-label small text-uppercase text-muted fw-bold">Loại nội dung</label>
+                    <select class="form-select lms-input mb-3" @bind="contentType">
+                        <option value="Markdown">Markdown</option>
+                        <option value="YoutubeVideo">Video YouTube</option>
+                        <option value="File">Tài liệu đính kèm</option>
+                    </select>
+
+                    @if (contentType == "Markdown")
+                    {
+                        <textarea class="form-control lms-focus-textarea" rows="8" @bind="markdown"
+                                  placeholder="# Tiêu đề&#10;&#10;Nội dung bài giảng dạng Markdown..."></textarea>
+                    }
+                    else if (contentType == "YoutubeVideo")
+                    {
+                        <input class="form-control lms-input" @bind="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
+                        <div class="form-text">Chỉ chấp nhận link YouTube (youtube.com hoặc youtu.be).</div>
+                    }
+                    else
+                    {
+                        <input class="form-control lms-input mb-2" @bind="fileName" placeholder="Tên tệp, ví dụ: bai-doc-them.pdf" />
+                        <input class="form-control lms-input" @bind="fileUrl" placeholder="URL tệp (tùy chọn)" />
+                        <div class="form-text">Định dạng cho phép (BR-04): .pdf, .doc, .docx, .ppt, .pptx, .zip</div>
+                    }
+
+                    <button class="btn lms-btn-primary mt-3" @onclick="SaveContent" disabled="@busy">
+                        <i class="bi bi-save me-1"></i> Lưu nội dung
+                    </button>
+
                 </div>
 
-                <h6 class="mt-3">Nội dung hiện có</h6>
-                <ul>
-                    @foreach (var c in contents!)
+                <h6 class="fw-bold">Nội dung hiện có (@contents.Count)</h6>
+                @if (contents.Count == 0)
+                {
+                    <p class="text-muted">Bài học chưa có nội dung nào.</p>
+                }
+                else
+                {
+                    @foreach (var c in contents)
                     {
-                        <li><span class="badge bg-info">@c.ContentType</span> @(c.MarkdownText ?? c.YoutubeUrl ?? c.FileName)</li>
+                        <div class="lms-card p-3 mb-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <span class="badge bg-info">@c.ContentType</span>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteContent(c.Id)" disabled="@busy">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                @if (c.ContentType == "Markdown")
+                                {
+                                    <MarkdownView Markdown="@Preview(c.MarkdownText)" />
+                                }
+                                else if (c.ContentType == "YoutubeVideo")
+                                {
+                                    <a href="@c.YoutubeUrl" target="_blank">@c.YoutubeUrl</a>
+                                    @if (!string.IsNullOrWhiteSpace(c.VideoSummary))
+                                    {
+                                        <div class="alert alert-light mt-2 mb-0"><strong>Tóm tắt AI:</strong> đã có</div>
+                                    }
+                                }
+                                else
+                                {
+                                    <i class="bi bi-paperclip me-1"></i>@c.FileName
+                                }
+                            </div>
+                        </div>
                     }
-                </ul>
+                }
+            }
+            else
+            {
+                <p class="text-muted">Chọn một bài học ở cột trái để soạn nội dung.</p>
             }
         </div>
     </div>
 }
 
 @code {
-    private List<Module>? modules;
-    private Guid? selectedModule;
-    private List<LessonEntity>? lessons;
-    private LessonEntity? currentLesson;
-    private List<LessonContent>? contents;
-    private string newLessonTitle = "", contentType = "Markdown", markdown = "", youtubeUrl = "", fileName = "";
+    private List<ModuleOptionDto> modules = new();
+    private List<LessonListItemDto> lessons = new();
+    private List<LessonContentDto> contents = new();
+
+    private Guid? selectedModuleId;
+    private Guid? currentLessonId;
+
+    private string newLessonTitle = "";
+    private string contentType = "Markdown";
+    private string markdown = "", youtubeUrl = "", fileName = "", fileUrl = "";
+
+    private string? message;
+    private bool ok, busy;
 
     protected override async Task OnInitializedAsync()
-    {
-        using var db = await DbFactory.CreateDbContextAsync();
-        modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
-    }
+        => modules = await Lessons.GetModuleOptionsAsync();
 
     private async Task OnModuleChanged(ChangeEventArgs e)
     {
-        selectedModule = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
-        currentLesson = null; contents = null;
-        await LoadLessons();
-    }
+        selectedModuleId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        currentLessonId = null;
+        contents = new();
+        message = null;
 
-    private async Task LoadLessons()
-    {
-        if (selectedModule is null) { lessons = null; return; }
-        using var db = await DbFactory.CreateDbContextAsync();
-        lessons = await db.Lessons.Where(l => l.ModuleId == selectedModule).OrderBy(l => l.OrderIndex).ToListAsync();
+        lessons = selectedModuleId is null
+            ? new()
+            : await Lessons.GetLessonsByModuleAsync(selectedModuleId.Value);
     }
 
     private async Task AddLesson()
-    {
-        if (selectedModule is null || string.IsNullOrWhiteSpace(newLessonTitle)) return;
-        using var db = await DbFactory.CreateDbContextAsync();
-        var order = await db.Lessons.CountAsync(l => l.ModuleId == selectedModule) + 1;
-        db.Lessons.Add(new LessonEntity { Id = Guid.NewGuid(), ModuleId = selectedModule.Value, Title = newLessonTitle.Trim(), OrderIndex = order, CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-        newLessonTitle = "";
-        await LoadLessons();
-    }
+        => await Run(async () =>
+        {
+            await Lessons.CreateLessonAsync(new CreateLessonRequest(selectedModuleId!.Value, newLessonTitle));
+            newLessonTitle = "";
+            lessons = await Lessons.GetLessonsByModuleAsync(selectedModuleId.Value);
+            Success("Đã tạo bài học mới.");
+        });
 
-    private async Task SelectLesson(LessonEntity l)
+    private async Task SelectLesson(Guid lessonId)
     {
-        currentLesson = l;
-        using var db = await DbFactory.CreateDbContextAsync();
-        contents = await db.LessonContents.Where(c => c.LessonId == l.Id).OrderBy(c => c.OrderIndex).ToListAsync();
+        currentLessonId = lessonId;
+        message = null;
+        contents = await Lessons.GetContentsAsync(lessonId);
     }
 
     private async Task SaveContent()
-    {
-        if (currentLesson is null) return;
-        using var db = await DbFactory.CreateDbContextAsync();
-        var order = await db.LessonContents.CountAsync(c => c.LessonId == currentLesson.Id) + 1;
-        db.LessonContents.Add(new LessonContent
+        => await Run(async () =>
         {
-            Id = Guid.NewGuid(),
-            LessonId = currentLesson.Id,
-            ContentType = contentType,
-            MarkdownText = contentType == "Markdown" ? markdown : null,
-            YoutubeUrl = contentType == "YoutubeVideo" ? youtubeUrl : null,
-            FileName = contentType == "File" ? fileName : null,
-            OrderIndex = order,
-            CreatedAt = DateTime.UtcNow
+            var request = new UpsertLessonContentRequest(contentType, markdown, youtubeUrl, fileUrl, fileName);
+            await Lessons.UpsertContentAsync(currentLessonId!.Value, request);
+
+            markdown = youtubeUrl = fileName = fileUrl = "";
+            await ReloadCurrentLesson();
+            Success("Đã lưu nội dung.");
         });
-        await db.SaveChangesAsync();
-        markdown = youtubeUrl = fileName = "";
-        await SelectLesson(currentLesson);
+
+    private async Task DeleteContent(Guid contentId)
+        => await Run(async () =>
+        {
+            await Lessons.DeleteContentAsync(contentId);
+            await ReloadCurrentLesson();
+            Success("Đã xóa nội dung.");
+        });
+
+    private async Task ReloadCurrentLesson()
+    {
+        contents = await Lessons.GetContentsAsync(currentLessonId!.Value);
+        lessons = await Lessons.GetLessonsByModuleAsync(selectedModuleId!.Value);
     }
+
+    /// <summary>Bọc mọi thao tác ghi: chặn double-click và biến lỗi nghiệp vụ thành thông báo đỏ thay vì trang lỗi.</summary>
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true;
+        message = null;
+
+        try
+        {
+            await action();
+        }
+        catch (LessonValidationException ex)
+        {
+            ok = false;
+            message = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void Success(string text)
+    {
+        ok = true;
+        message = text;
+    }
+
+    private static string Preview(string? md)
+        => md is null || md.Length <= 400 ? md ?? "" : md[..400] + "…";
 }
