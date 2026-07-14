@@ -3,21 +3,25 @@
 @using EduNexus.Web.Services
 @inject UserSession Session
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
+@implements IDisposable
 
-<PageTitle>Student Dashboard — EduNexus</PageTitle>
+<PageTitle>Bảng điều khiển — EduNexus</PageTitle>
 
 <div class="page-header mb-4">
-    <h2>Bảng điều khiển Học viên <span class="screen-tag">Common · Student</span></h2>
-    <p class="text-muted">Danh sách các courses, classes, và các packages mà bạn đã đăng ký.</p>
+    <h2>Bảng điều khiển @(Session.CurrentRole?.Name == "Admin" ? "(Quản trị viên)" : "Học viên") <span class="screen-tag">Common</span></h2>
+    <p class="text-muted">Danh sách các courses, classes, và các packages.</p>
 </div>
 
 @if (!Session.IsLoggedIn)
 {
     <div class="alert alert-warning">Vui lòng đăng nhập để xem thông tin học tập của bạn.</div>
 }
-else if (Session.CurrentRole?.Name != "Student" && Session.CurrentRole?.Name != "Admin")
+else if (!string.IsNullOrEmpty(loadError))
 {
-    <div class="alert alert-info">Dashboard này thiết kế riêng cho Học viên (Student). Tài khoản của bạn là @Session.CurrentRole?.Name.</div>
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle me-2"></i>@loadError
+        <button class="btn btn-sm btn-outline-danger ms-3" @onclick="RetryLoad">Thử lại</button>
+    </div>
 }
 else if (courses == null)
 {
@@ -27,10 +31,10 @@ else
 {
     <div class="row g-4">
         <div class="col-md-12">
-            <h5 class="fw-bold mb-3"><i class="bi bi-collection-play text-primary me-2"></i> Khóa học của bạn</h5>
+            <h5 class="fw-bold mb-3"><i class="bi bi-collection-play text-primary me-2"></i> Khóa học</h5>
             @if (!courses.Any())
             {
-                <div class="lms-card p-4 text-center text-muted">Bạn chưa được cấp quyền truy cập khóa học nào.</div>
+                <div class="lms-card p-4 text-center text-muted">Chưa có khóa học nào.</div>
             }
             else
             {
@@ -41,7 +45,7 @@ else
                             <div class="lms-card h-100 p-3">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <h6 class="fw-bold mb-0">@c.Title</h6>
-                                    <span class="badge bg-success">Đã cấp quyền</span>
+                                    <span class="badge bg-success">@c.Status</span>
                                 </div>
                                 <p class="text-muted small mb-3">@c.Description</p>
                                 <a href="/progress" class="btn lms-btn-primary btn-sm w-100">Tiếp tục học</a>
@@ -55,9 +59,9 @@ else
         <div class="col-md-6">
             <h5 class="fw-bold mb-3"><i class="bi bi-people-fill text-info me-2"></i> Lớp học (Classes)</h5>
             <div class="lms-card p-0 overflow-hidden">
-                @if (!classes.Any())
+                @if (classes == null || !classes.Any())
                 {
-                    <div class="p-4 text-center text-muted">Bạn chưa tham gia lớp học nào.</div>
+                    <div class="p-4 text-center text-muted">Chưa tham gia lớp học nào.</div>
                 }
                 else
                 {
@@ -81,9 +85,9 @@ else
         <div class="col-md-6">
             <h5 class="fw-bold mb-3"><i class="bi bi-box2-heart text-warning me-2"></i> Gói thành viên (Packages)</h5>
             <div class="lms-card p-0 overflow-hidden">
-                @if (!packages.Any())
+                @if (packages == null || !packages.Any())
                 {
-                    <div class="p-4 text-center text-muted">Bạn chưa đăng ký gói nào.</div>
+                    <div class="p-4 text-center text-muted">Chưa đăng ký gói nào.</div>
                 }
                 else
                 {
@@ -109,12 +113,7 @@ else
     private List<Course>? courses;
     private List<EduNexus.Api.Common.Entities.Class>? classes;
     private List<PackageSubscription>? packages;
-
-    protected override async Task OnInitializedAsync()
-    {
-        Session.OnChange += StateHasChanged;
-        if (Session.IsLoggedIn) await LoadData();
-    }
+    private string? loadError;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -125,40 +124,54 @@ else
         }
     }
 
+    private async Task RetryLoad()
+    {
+        loadError = null;
+        await LoadData();
+    }
+
     private async Task LoadData()
     {
-        if (Session.CurrentUser == null) return;
-        var sid = Session.CurrentUser.Id;
+        try
+        {
+            if (Session.CurrentUser == null) return;
+            var sid = Session.CurrentUser.Id;
 
-        using var db = await DbFactory.CreateDbContextAsync();
-        
-        // 1. Khóa học được cấp quyền (thông qua AccessGrants)
-        var courseIds = await db.AccessGrants.Where(a => a.StudentId == sid && !a.IsRevoked && a.CourseId != null).Select(a => a.CourseId).ToListAsync();
-        
-        if (Session.CurrentRole?.Name == "Admin")
-        {
-            courses = await db.Courses.ToListAsync();
-        }
-        else if (courseIds.Count == 0 && Session.CurrentRole?.Name == "Student") 
-        {
-            courses = await db.Courses.Take(2).ToListAsync(); // Demo purposes
-        }
-        else
-        {
-            courses = await db.Courses.Where(c => courseIds.Contains(c.Id)).ToListAsync();
-        }
+            using var db = await DbFactory.CreateDbContextAsync();
+            
+            if (Session.CurrentRole?.Name == "Admin")
+            {
+                courses = await db.Courses.ToListAsync();
+                classes = await db.Classes.ToListAsync();
+                packages = await db.PackageSubscriptions.ToListAsync();
+            }
+            else
+            {
+                // Khóa học thông qua AccessGrants
+                var courseIds = await db.AccessGrants
+                    .Where(a => a.StudentId == sid && !a.IsRevoked && a.CourseId != null)
+                    .Select(a => a.CourseId).ToListAsync();
+                
+                if (courseIds.Count == 0)
+                {
+                    courses = await db.Courses.Take(3).ToListAsync(); // Demo fallback
+                }
+                else
+                {
+                    courses = await db.Courses.Where(c => courseIds.Contains(c.Id)).ToListAsync();
+                }
 
-        // 2. Classes
-        if (Session.CurrentRole?.Name == "Admin")
-        {
-            classes = await db.Classes.ToListAsync();
-            packages = await db.PackageSubscriptions.ToListAsync();
+                var classIds = await db.ClassStudents.Where(cs => cs.StudentId == sid).Select(cs => cs.ClassId).ToListAsync();
+                classes = await db.Classes.Where(c => classIds.Contains(c.Id)).ToListAsync();
+                packages = await db.PackageSubscriptions.Where(ps => ps.StudentId == sid).ToListAsync();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            var classIds = await db.ClassStudents.Where(cs => cs.StudentId == sid).Select(cs => cs.ClassId).ToListAsync();
-            classes = await db.Classes.Where(c => classIds.Contains(c.Id)).ToListAsync();
-            packages = await db.PackageSubscriptions.Where(ps => ps.StudentId == sid).ToListAsync();
+            loadError = "Không thể tải dữ liệu: " + (ex.InnerException?.Message ?? ex.Message);
+            courses = new();
+            classes = new();
+            packages = new();
         }
     }
 

@@ -92,22 +92,28 @@ else
     {
         if (Session.CurrentUser == null) return;
         
-        using var db = await DbFactory.CreateDbContextAsync();
-        
-        if (Session.CurrentRole?.Name == "Admin")
+        try
         {
-            courses = await db.Courses.OrderByDescending(c => c.CreatedAt).ToListAsync();
-        }
-        else 
-        {
-            courses = await db.Courses.Where(c => c.OwnerSmeId == Session.CurrentUser.Id)
-                                      .OrderByDescending(c => c.CreatedAt).ToListAsync();
+            using var db = await DbFactory.CreateDbContextAsync();
             
-            // Fallback for demo purposes if SME has no courses mapped yet
-            if(!courses.Any())
+            if (Session.CurrentRole?.Name == "Admin")
             {
-                courses = await db.Courses.ToListAsync();
+                courses = await db.Courses.OrderByDescending(c => c.CreatedAt).ToListAsync();
             }
+            else 
+            {
+                courses = await db.Courses.Where(c => c.OwnerSmeId == Session.CurrentUser.Id)
+                                          .OrderByDescending(c => c.CreatedAt).ToListAsync();
+                
+                if(!courses.Any())
+                {
+                    courses = await db.Courses.ToListAsync();
+                }
+            }
+        }
+        catch
+        {
+            courses = new();
         }
     }
 

@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 
 <div class="lms-layout">
     <div class="lms-sidebar">
@@ -9,7 +10,7 @@
         <header class="lms-header justify-content-between">
             <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-list fs-4 text-muted d-md-none" style="cursor: pointer;"></i>
-                <h5 class="mb-0 fw-bold" style="color: var(--lms-text-main);">Hệ thống Học tập & Đào tạo EduNexus</h5>
+                <h5 class="mb-0 fw-bold" style="color: var(--lms-text-main);">Hệ thống Học tập &amp; Đào tạo EduNexus</h5>
             </div>
             
             <div class="d-flex align-items-center gap-4">
@@ -51,12 +52,26 @@
         </header>
 
         <main class="lms-content">
-            @Body
+            <ErrorBoundary @ref="errorBoundary">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="ex">
+                    <div class="alert alert-danger m-4" role="alert">
+                        <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Đã xảy ra lỗi</h5>
+                        <p>Trang này gặp sự cố khi tải dữ liệu. Vui lòng thử lại.</p>
+                        <hr>
+                        <button class="btn btn-outline-danger btn-sm" @onclick="RecoverFromError">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Thử lại
+                        </button>
+                    </div>
+                </ErrorContent>
+            </ErrorBoundary>
         </main>
     </div>
 </div>
 
-<div id="blazor-error-ui">
+<div id="blazor-error-ui" style="display: none;">
     An unhandled error has occurred.
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
@@ -65,15 +80,29 @@
 @code {
     [Inject] EduNexus.Web.Services.UserSession Session { get; set; } = default!;
     [Inject] NavigationManager Nav { get; set; } = default!;
+    
+    private ErrorBoundary? errorBoundary;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await Session.InitializeAsync();
-            Session.OnChange += StateHasChanged;
-            StateHasChanged();
+            try
+            {
+                await Session.InitializeAsync();
+                Session.OnChange += StateHasChanged;
+                StateHasChanged();
+            }
+            catch
+            {
+                // Prevent circuit crash on init
+            }
         }
+    }
+
+    private void RecoverFromError()
+    {
+        errorBoundary?.Recover();
     }
 
     public void Dispose()
@@ -83,7 +112,14 @@
 
     private async Task Logout()
     {
-        await Session.LogoutAsync();
-        Nav.NavigateTo("/login");
+        try
+        {
+            await Session.LogoutAsync();
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+        catch
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
     }
 }

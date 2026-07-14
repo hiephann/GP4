@@ -106,6 +106,12 @@
             return;
         }
 
+        if (password.Length < 6)
+        {
+            errorMessage = "Mật khẩu phải có ít nhất 6 ký tự.";
+            return;
+        }
+
         isLoading = true;
         errorMessage = "";
 
@@ -121,6 +127,17 @@
                 return;
             }
 
+            // Look up role from DB instead of hardcoding ID
+            var roleName = roleSelection == "Student" ? "Student" : "Teacher";
+            var role = await db.Roles.FirstOrDefaultAsync(r => r.Name == roleName);
+            
+            if (role == null)
+            {
+                errorMessage = "Không tìm thấy vai trò phù hợp trong hệ thống.";
+                isLoading = false;
+                return;
+            }
+
             var newUser = new User
             {
                 Id = Guid.NewGuid(),
@@ -129,29 +146,28 @@
                 PasswordHash = "$2a$12$mockhash", // In real project, use BCrypt
                 AuthProvider = "Local",
                 IsEmailVerified = true,
-                IsActive = roleSelection == "Student", // Teacher needs approval, so IsActive = false pending
+                IsActive = roleSelection == "Student", // Teacher needs approval
                 CreatedAt = DateTime.UtcNow
             };
 
             db.Users.Add(newUser);
 
-            // Assign role
-            var roleId = roleSelection == "Student" ? 5 : 3; // 5 = Student, 3 = Teacher (mock mapping)
             db.UserRoles.Add(new UserRole
             {
                 UserId = newUser.Id,
-                RoleId = roleId
+                RoleId = role.Id
             });
 
             await db.SaveChangesAsync();
 
             isSuccess = true;
+            StateHasChanged();
             await Task.Delay(1500);
             NavManager.NavigateTo("/login");
         }
         catch (Exception ex)
         {
-            errorMessage = "Có lỗi xảy ra: " + ex.Message;
+            errorMessage = "Có lỗi xảy ra: " + ex.InnerException?.Message ?? ex.Message;
         }
         finally
         {

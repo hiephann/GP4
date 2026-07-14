@@ -141,10 +141,14 @@
         
         if (success)
         {
-            // Reset layout to normal if we were rendering without MainLayout
-            // Note: Since we are inside MainLayout by default in Blazor Web App, 
-            // the layout is already there. We just navigate.
-            NavManager.NavigateTo("/dashboard");
+            // Redirect dựa theo role
+            var role = Session.CurrentRole?.Name;
+            var target = role switch
+            {
+                "SME" or "Teacher" => "/courses",
+                _ => "/dashboard"
+            };
+            NavManager.NavigateTo(target, forceLoad: true);
         }
         else
         {

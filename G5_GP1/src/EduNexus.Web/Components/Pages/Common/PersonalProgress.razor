@@ -149,30 +149,37 @@ else
     private async Task LoadProgress()
     {
         if (Session.CurrentUser == null) return;
-        var sid = Session.CurrentUser.Id;
-
-        using var db = await DbFactory.CreateDbContextAsync();
         
-        // Cố định lấy khóa học đầu tiên để làm demo nếu chưa có phân quyền chuẩn xác
-        courses = await db.Courses.ToListAsync(); 
-        
-        var courseIds = courses.Select(c => c.Id).ToList();
-        modules = await db.Modules.Where(m => courseIds.Contains(m.CourseId)).ToListAsync();
-        var modIds = modules.Select(m => m.Id).ToList();
-        
-        allLessons = await db.Lessons.Where(l => modIds.Contains(l.ModuleId)).ToListAsync();
-        lessonProgress = await db.LessonProgress.Where(p => p.StudentId == sid).ToListAsync();
-        
-        allQuizzes = await db.Quizzes.Where(q => courseIds.Contains(q.CourseId.Value)).ToListAsync();
-        quizAttempts = await db.QuizAttempts.Where(a => a.StudentId == sid).ToListAsync();
-        
-        allAssignments = await db.Assignments.Where(a => modIds.Contains(a.ModuleId)).ToListAsync();
-        submissions = await db.Submissions.Where(s => s.StudentId == sid).ToListAsync();
-        
-        // Mock Progress nếu chưa có (Demo purposes)
-        if (!lessonProgress.Any() && allLessons.Any())
+        try
         {
-            lessonProgress.Add(new LessonProgress { LessonId = allLessons.First().Id, IsCompleted = true });
+            var sid = Session.CurrentUser.Id;
+
+            using var db = await DbFactory.CreateDbContextAsync();
+            
+            courses = await db.Courses.ToListAsync(); 
+            
+            var courseIds = courses.Select(c => c.Id).ToList();
+            modules = await db.Modules.Where(m => courseIds.Contains(m.CourseId)).ToListAsync();
+            var modIds = modules.Select(m => m.Id).ToList();
+            
+            allLessons = await db.Lessons.Where(l => modIds.Contains(l.ModuleId)).ToListAsync();
+            lessonProgress = await db.LessonProgress.Where(p => p.StudentId == sid).ToListAsync();
+            
+            allQuizzes = await db.Quizzes.Where(q => q.CourseId != null && courseIds.Contains(q.CourseId.Value)).ToListAsync();
+            quizAttempts = await db.QuizAttempts.Where(a => a.StudentId == sid).ToListAsync();
+            
+            allAssignments = await db.Assignments.Where(a => modIds.Contains(a.ModuleId)).ToListAsync();
+            submissions = await db.Submissions.Where(s => s.StudentId == sid).ToListAsync();
+            
+            if (!lessonProgress.Any() && allLessons.Any())
+            {
+                lessonProgress.Add(new LessonProgress { LessonId = allLessons.First().Id, IsCompleted = true });
+            }
+        }
+        catch
+        {
+            courses ??= new();
+            modules ??= new();
         }
     }
 

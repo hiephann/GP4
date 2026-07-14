@@ -3,60 +3,54 @@
 @inject UserSession Session
 @inject NavigationManager NavManager
 
-<PageTitle>Đang điều hướng...</PageTitle>
+<PageTitle>EduNexus — Đang tải...</PageTitle>
 
-<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
     <div class="text-center">
         <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <h4 class="text-muted">Đang tải không gian làm việc của bạn...</h4>
+        <h4 class="text-muted">Đang tải không gian làm việc...</h4>
     </div>
 </div>
 
 @code {
-    protected override void OnInitialized()
-    {
-        Session.OnChange += StateHasChanged;
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Cho phép hệ thống tải xong trạng thái session
-            await Task.Delay(300); // Đợi xíu cho UX mượt
-            
-            if (!Session.IsLoggedIn)
+            try
             {
-                NavManager.NavigateTo("/login");
-                return;
-            }
+                // Đợi Session init xong (MainLayout đã gọi InitializeAsync)
+                int attempts = 0;
+                while (!Session.IsInitialized && attempts < 20)
+                {
+                    await Task.Delay(100);
+                    attempts++;
+                }
 
-            var role = Session.CurrentRole?.Name;
-            
-            if (role == "Student")
-            {
-                NavManager.NavigateTo("/dashboard");
+                if (!Session.IsLoggedIn)
+                {
+                    NavManager.NavigateTo("/login", forceLoad: false);
+                    return;
+                }
+
+                var role = Session.CurrentRole?.Name;
+                
+                var target = role switch
+                {
+                    "Student" => "/dashboard",
+                    "Admin" => "/dashboard",
+                    "SME" or "Teacher" => "/courses",
+                    _ => "/login"
+                };
+                
+                NavManager.NavigateTo(target, forceLoad: false);
             }
-            else if (role == "Admin")
+            catch
             {
-                NavManager.NavigateTo("/dashboard"); // Admin tạm thời cũng vào dashboard
-            }
-            else if (role == "SME" || role == "Teacher")
-            {
-                NavManager.NavigateTo("/courses"); // Giáo viên vào màn quản lý khóa học
-            }
-            else
-            {
-                // Fallback
-                NavManager.NavigateTo("/login");
+                NavManager.NavigateTo("/login", forceLoad: false);
             }
         }
-    }
-
-    public void Dispose()
-    {
-        Session.OnChange -= StateHasChanged;
     }
 }
