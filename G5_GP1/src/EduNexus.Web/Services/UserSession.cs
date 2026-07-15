@@ -15,8 +15,11 @@ public class UserSession
 
     public User? CurrentUser { get; private set; }
     public Role? CurrentRole { get; private set; }
+    public HashSet<string> RoleNames { get; } = new(StringComparer.OrdinalIgnoreCase);
     public bool IsLoggedIn => CurrentUser != null;
     public bool IsInitialized => _isInitialized;
+
+    public bool IsInRole(params string[] roles) => roles.Any(RoleNames.Contains);
 
     public event Action? OnChange;
 
@@ -128,6 +131,7 @@ public class UserSession
     {
         CurrentUser = null;
         CurrentRole = null;
+        RoleNames.Clear();
         try
         {
             await _sessionStorage.DeleteAsync("UserId");
@@ -147,17 +151,19 @@ public class UserSession
             CurrentUser = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (CurrentUser != null)
             {
-                var userRole = await db.UserRoles.FirstOrDefaultAsync(ur => ur.UserId == userId);
-                if (userRole != null)
-                {
-                    CurrentRole = await db.Roles.FirstOrDefaultAsync(r => r.Id == userRole.RoleId);
-                }
+                var roles = await db.UserRoles.Where(ur => ur.UserId == userId)
+                    .Join(db.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r).ToListAsync();
+                RoleNames.Clear();
+                foreach (var role in roles) RoleNames.Add(role.Name);
+                CurrentRole = roles.OrderByDescending(r => r.Name == "Admin")
+                    .ThenByDescending(r => r.Name == "SME").FirstOrDefault();
             }
         }
         catch
         {
             CurrentUser = null;
             CurrentRole = null;
+            RoleNames.Clear();
         }
     }
 }

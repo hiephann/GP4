@@ -29,6 +29,10 @@ else if (course == null && Id.HasValue)
 {
     <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
 }
+else if (!Session.IsInRole("SME", "CourseManager", "Admin"))
+{
+    <div class="alert alert-danger">Bạn không có quyền quản lý cấu trúc khóa học.</div>
+}
 else if (course == null && !Id.HasValue)
 {
     <div class="alert alert-info">Vui lòng chọn một khóa học từ <a href="/courses">Danh sách Khóa học</a>.</div>
@@ -175,20 +179,18 @@ else if (course != null)
 
     private async Task LoadCourse()
     {
-        if (Session.CurrentUser == null || !Id.HasValue) 
-        {
-            // If no ID passed, for demo we just pick the first one
-            if(Id == null)
-            {
-                using var db = await DbFactory.CreateDbContextAsync();
-                course = await db.Courses.FirstOrDefaultAsync();
-                if (course != null) Id = course.Id;
-            }
-            if(!Id.HasValue) return;
-        }
+        if (Session.CurrentUser == null || !Id.HasValue || !Session.IsInRole("SME", "CourseManager", "Admin")) return;
 
         using var ctx = await DbFactory.CreateDbContextAsync();
-        course = await ctx.Courses.FirstOrDefaultAsync(c => c.Id == Id.Value);
+        if (Session.IsInRole("Admin"))
+            course = await ctx.Courses.FirstOrDefaultAsync(c => c.Id == Id.Value);
+        else if (Session.IsInRole("SME"))
+            course = await ctx.Courses.FirstOrDefaultAsync(c => c.Id == Id.Value && c.OwnerSmeId == Session.CurrentUser.Id);
+        else
+        {
+            var groupIds = ctx.CourseGroupManagers.Where(x => x.UserId == Session.CurrentUser.Id).Select(x => x.CourseGroupId);
+            course = await ctx.Courses.FirstOrDefaultAsync(c => c.Id == Id.Value && ctx.CourseGroupCourses.Any(x => x.CourseId == c.Id && groupIds.Contains(x.CourseGroupId)));
+        }
         if (course != null)
         {
             modules = await ctx.Modules.Where(m => m.CourseId == course.Id).OrderBy(m => m.OrderIndex).ToListAsync();

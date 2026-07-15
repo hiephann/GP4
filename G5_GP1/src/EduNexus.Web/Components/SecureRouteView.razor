@@ -1,0 +1,45 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using EduNexus.Web.Services
+@inject UserSession Session
+@inject NavigationManager Nav
+
+@if (IsPublic || (Session.IsInitialized && CanAccess))
+{
+    <RouteView RouteData="RouteData" DefaultLayout="typeof(Layout.MainLayout)" />
+    <FocusOnNavigate RouteData="RouteData" Selector="h1" />
+}
+else if (!Session.IsInitialized)
+{
+    <div class="d-flex justify-content-center align-items-center mt-5"><div class="spinner-border text-primary" role="status"></div></div>
+}
+
+@code {
+    [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
+    private string PageName => RouteData.PageType.Name;
+    private bool IsPublic => PageName is "Login" or "Register" or "ForgotPassword" or "ResetPassword" or "AuthCallbackProcessor" or "Error";
+    private bool CanAccess => IsPublic || (Session.IsLoggedIn && HasRoleAccess());
+
+    private bool HasRoleAccess() => PageName switch
+    {
+        "CourseList" or "CourseStructure" or "LessonEditor" or "AiLessonStaging" or "LessonTextExtract" or
+        "QuestionBank" or "QuestionDetail" or "QuestionImport" or "AiQuestionStaging" or
+        "FlashcardEditor" or "AiFlashcardStaging" => Session.IsInRole("Admin", "SME", "CourseManager"),
+        "AssignmentList" or "AssignmentDetail" or "AssignmentResult" => Session.IsInRole("Admin", "Teacher", "CourseManager"),
+        "AssignmentSubmit" or "FlashcardPractice" or "FlashcardLibrary" or "LessonView" or
+        "NewQuiz" or "QuizTaking" or "QuizResults" or "QuizHistory" or "QuizReview" or
+        "Dashboard" or "PersonalProgress" => Session.IsInRole("Admin", "Student"),
+        _ => true
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Session.InitializeAsync();
+        await InvokeAsync(StateHasChanged);
+        if (!IsPublic && !CanAccess)
+        {
+            var returnUrl = Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri));
+            Nav.NavigateTo(Session.IsLoggedIn ? "/?error=access-denied" : $"/login?returnUrl={returnUrl}", forceLoad: false);
+        }
+    }
+}

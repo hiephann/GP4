@@ -35,6 +35,14 @@ public class CourseGroupCourse
     public Course? Course { get; set; }
 }
 
+public class CourseGroupManager
+{
+    public Guid CourseGroupId { get; set; }
+    public Guid UserId { get; set; }
+    public DateTime AssignedAt { get; set; }
+    public Guid? AssignedById { get; set; }
+}
+
 public class Module
 {
     public Guid Id { get; set; }

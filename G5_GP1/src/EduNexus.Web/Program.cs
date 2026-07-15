@@ -33,6 +33,12 @@ builder.Services.AddScoped<IQuestionService, QuestionService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddControllers();
+builder.Services.AddHttpClient("GoogleTokenValidation", client =>
+{
+    // A failed external Google request must never leave the login page waiting
+    // indefinitely. The browser can retry the sign-in button afterwards.
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // EF Core DbContext (SQL Server) — dùng Factory cho Blazor Server để tránh xung đột scope
 builder.Services.AddDbContextFactory<EduNexusDbContext>(options =>

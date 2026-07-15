@@ -29,6 +29,7 @@ public class EduNexusDbContext : DbContext
     public DbSet<CourseGroup> CourseGroups => Set<CourseGroup>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<CourseGroupCourse> CourseGroupCourses => Set<CourseGroupCourse>();
+    public DbSet<CourseGroupManager> CourseGroupManagers => Set<CourseGroupManager>();
     public DbSet<Module> Modules => Set<Module>();
 
     // --- Lesson ---
@@ -88,6 +89,7 @@ public class EduNexusDbContext : DbContext
         // Khóa chính kép
         b.Entity<UserRole>().HasKey(x => new { x.UserId, x.RoleId });
         b.Entity<CourseGroupCourse>().HasKey(x => new { x.CourseGroupId, x.CourseId });
+        b.Entity<CourseGroupManager>().HasKey(x => new { x.CourseGroupId, x.UserId });
 
         // Ràng buộc duy nhất phản ánh nghiệp vụ
         b.Entity<User>().HasIndex(x => x.Email).IsUnique();

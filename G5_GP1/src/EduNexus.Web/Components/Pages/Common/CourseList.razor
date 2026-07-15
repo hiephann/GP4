@@ -20,7 +20,7 @@
 {
     <div class="alert alert-warning">Vui lòng đăng nhập để xem danh sách.</div>
 }
-else if (Session.CurrentRole?.Name != "SME" && Session.CurrentRole?.Name != "Admin")
+else if (!Session.IsInRole("SME", "CourseManager", "Admin"))
 {
     <div class="alert alert-danger">Màn hình này dành riêng cho chuyên gia nội dung (SME). Tài khoản của bạn là @Session.CurrentRole?.Name.</div>
 }
@@ -96,19 +96,20 @@ else
         {
             using var db = await DbFactory.CreateDbContextAsync();
             
-            if (Session.CurrentRole?.Name == "Admin")
+            if (Session.IsInRole("Admin"))
             {
                 courses = await db.Courses.OrderByDescending(c => c.CreatedAt).ToListAsync();
             }
-            else 
+            else if (Session.IsInRole("SME"))
             {
                 courses = await db.Courses.Where(c => c.OwnerSmeId == Session.CurrentUser.Id)
                                           .OrderByDescending(c => c.CreatedAt).ToListAsync();
-                
-                if(!courses.Any())
-                {
-                    courses = await db.Courses.ToListAsync();
-                }
+            }
+            else if (Session.IsInRole("CourseManager"))
+            {
+                var groupIds = db.CourseGroupManagers.Where(x => x.UserId == Session.CurrentUser.Id).Select(x => x.CourseGroupId);
+                courses = await db.Courses.Where(c => db.CourseGroupCourses.Any(x => x.CourseId == c.Id && groupIds.Contains(x.CourseGroupId)))
+                    .OrderByDescending(c => c.CreatedAt).ToListAsync();
             }
         }
         catch

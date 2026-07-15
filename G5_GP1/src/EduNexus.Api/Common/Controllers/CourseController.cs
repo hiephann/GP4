@@ -15,14 +15,14 @@ public class CourseController : ControllerBase
 
     // Course List — danh sách khóa học của SME
     [HttpGet]
-    public async Task<ActionResult<List<CourseListItemDto>>> GetForSme([FromQuery] Guid smeId, CancellationToken ct)
-        => Ok(await _courses.GetCoursesForSmeAsync(smeId, ct));
+    public async Task<ActionResult<List<CourseListItemDto>>> GetForUser([FromQuery] Guid userId, CancellationToken ct)
+        => Ok(await _courses.GetCoursesForUserAsync(userId, ct));
 
     // Course Structure — module list & contents
     [HttpGet("{courseId:guid}/structure")]
-    public async Task<ActionResult<CourseStructureDto>> GetStructure(Guid courseId, CancellationToken ct)
+    public async Task<ActionResult<CourseStructureDto>> GetStructure(Guid courseId, [FromQuery] Guid actorId, CancellationToken ct)
     {
-        var dto = await _courses.GetStructureAsync(courseId, ct);
+        var dto = await _courses.GetStructureAsync(courseId, actorId, ct);
         return dto is null ? NotFound() : Ok(dto);
     }
 
@@ -31,9 +31,9 @@ public class CourseController : ControllerBase
         => Ok(await _courses.CreateCourseAsync(title, smeId, ct));
 
     [HttpPost("{courseId:guid}/publish")]
-    public async Task<IActionResult> Publish(Guid courseId, CancellationToken ct)
+    public async Task<IActionResult> Publish(Guid courseId, [FromQuery] Guid actorId, CancellationToken ct)
     {
-        await _courses.PublishAsync(courseId, ct);
+        await _courses.PublishAsync(courseId, actorId, ct);
         return NoContent();
     }
 }

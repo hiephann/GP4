@@ -1,77 +1,53 @@
 @page "/login"
 @layout EduNexus.Web.Components.Layout.EmptyLayout
-@using EduNexus.Api.Common.Entities
 @using EduNexus.Web.Services
 @inject UserSession Session
 @inject NavigationManager NavManager
+@inject IConfiguration Configuration
 
-<PageTitle>Đăng nhập hệ thống — EduNexus G5</PageTitle>
+<PageTitle>Đăng nhập | EduNexus</PageTitle>
 
-<div class="row g-0" style="min-height: 100vh;">
-    <!-- Cột trái: Hình ảnh/Branding -->
-    <div class="col-md-6 d-none d-md-flex flex-column justify-content-center align-items-center text-white position-relative overflow-hidden" 
-         style="background: var(--lms-primary-gradient);">
-        
-        <!-- Các vòng tròn trang trí -->
-        <div class="position-absolute" style="width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%; top: -50px; left: -50px;"></div>
-        <div class="position-absolute" style="width: 400px; height: 400px; background: rgba(255,255,255,0.05); border-radius: 50%; bottom: -100px; right: -100px;"></div>
-        
-        <div class="text-center z-1 px-5">
-            <div class="d-inline-flex align-items-center justify-content-center bg-white rounded-circle mb-4 shadow" 
-                 style="width: 80px; height: 80px; color: var(--lms-primary); font-size: 2.5rem;">
+<div class="row g-0 auth-page" style="min-height: 100vh;">
+    <section class="col-md-6 d-none d-md-flex flex-column justify-content-center align-items-center text-white p-5" style="background: var(--lms-primary-gradient);">
+        <div class="text-center" style="max-width: 32rem;">
+            <div class="d-inline-flex align-items-center justify-content-center bg-white rounded-circle shadow mb-4" style="width: 5rem; height: 5rem; color: var(--lms-primary); font-size: 2.25rem;">
                 <i class="bi bi-mortarboard-fill"></i>
             </div>
             <h1 class="display-5 fw-bold mb-3">EduNexus LMS</h1>
-            <p class="lead" style="opacity: 0.9;">Hệ thống Quản lý Học tập Toàn diện. Trải nghiệm giáo dục thế hệ mới với tích hợp AI.</p>
+            <p class="lead mb-0">Nền tảng học tập và đào tạo tích hợp AI.</p>
         </div>
-    </div>
+    </section>
 
-    <!-- Cột phải: Form đăng nhập -->
-    <div class="col-md-6 d-flex justify-content-center align-items-center bg-white">
-        <div class="w-100" style="max-width: 420px; padding: 2rem;">
-            <div class="mb-5 text-center">
-                <h3 class="fw-bold text-dark">Chào mừng trở lại!</h3>
-                <p class="text-muted">Vui lòng đăng nhập để tiếp tục</p>
-            </div>
+    <main class="col-md-6 d-flex justify-content-center align-items-center bg-white p-4">
+        <div class="w-100" style="max-width: 26.25rem;">
+            <header class="mb-4 text-center">
+                <h2 class="h3 fw-bold text-dark mb-2">Chào mừng trở lại</h2>
+                <p class="text-muted mb-0">Đăng nhập để tiếp tục sử dụng EduNexus.</p>
+            </header>
 
-            @if (!string.IsNullOrEmpty(errorMessage))
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
             {
-                <div class="alert alert-danger py-2 small">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMessage
+                <div class="alert alert-danger small" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
                 </div>
             }
 
-            <!-- Form Đăng nhập Truyền thống -->
             <form @onsubmit="HandleLogin">
                 <div class="mb-3">
-                    <label class="form-label fw-bold small text-dark">Email</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
-                        <input type="email" class="form-control border-start-0 ps-0" @bind="email" required placeholder="name@domain.com">
-                    </div>
+                    <label class="form-label fw-semibold" for="login-email">Email</label>
+                    <input id="login-email" type="email" class="form-control" @bind="email" autocomplete="email" required placeholder="name@example.com" />
                 </div>
-                
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between">
-                        <label class="form-label fw-bold small text-dark">Mật khẩu</label>
-                        <a href="/forgot-password" class="small text-decoration-none" style="color: var(--lms-primary);">Quên mật khẩu?</a>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <label class="form-label fw-semibold" for="login-password">Mật khẩu</label>
+                        <a href="/forgot-password" class="small">Quên mật khẩu?</a>
                     </div>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
-                        <input type="password" class="form-control border-start-0 ps-0" @bind="password" required placeholder="••••••••">
-                    </div>
+                    <input id="login-password" type="password" class="form-control" @bind="password" autocomplete="current-password" required placeholder="Nhập mật khẩu" />
                 </div>
-
-                <div class="mb-4 form-check">
-                    <input type="checkbox" class="form-check-input" id="rememberMe">
-                    <label class="form-check-label small text-muted" for="rememberMe">Ghi nhớ đăng nhập</label>
-                </div>
-
-                <button type="submit" class="btn lms-btn-primary w-100 mb-3 py-2 fw-bold" disabled="@isLoading">
+                <button type="submit" class="btn lms-btn-primary w-100 py-2" disabled="@isLoading">
                     @if (isLoading)
                     {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Đang đăng nhập...</span>
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span><span>Đang đăng nhập…</span>
                     }
                     else
                     {
@@ -80,82 +56,83 @@
                 </button>
             </form>
 
-            <div class="d-flex align-items-center my-4">
-                <hr class="flex-grow-1 text-muted">
-                <span class="px-3 text-muted small fw-bold">HOẶC</span>
-                <hr class="flex-grow-1 text-muted">
+            <div class="d-flex align-items-center my-4" aria-hidden="true">
+                <hr class="flex-grow-1" /><span class="px-3 text-muted small">HOẶC</span><hr class="flex-grow-1" />
             </div>
 
-            <!-- Nút Google Login -->
-            <a href="/auth/google" class="btn btn-outline-dark w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2 mb-4 text-decoration-none">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-google" viewBox="0 0 16 16">
-                  <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352 2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z"/>
-                </svg>
-                Tiếp tục với Google
-            </a>
-
-            <div class="text-center small text-muted">
-                Chưa có tài khoản? <a href="/register" class="text-decoration-none fw-bold" style="color: var(--lms-primary);">Đăng ký ngay</a>
-            </div>
-
-            <!-- Nút Quick Fill cho Giảng viên chấm điểm -->
-            <div class="mt-5 p-3 rounded" style="background: var(--lms-surface); border: 1px dashed var(--lms-border);">
-                <p class="small text-muted mb-2 text-center fw-bold"><i class="bi bi-magic me-1"></i> Trình chấm điểm (Demo Quick Fill)</p>
-                <div class="d-flex justify-content-center gap-2 flex-wrap">
-                    <button class="btn btn-sm btn-outline-secondary" style="font-size: 0.75rem;" @onclick="@(() => FillForm("admin@edunexus.vn", "admin123"))">Admin</button>
-                    <button class="btn btn-sm btn-outline-primary" style="font-size: 0.75rem;" @onclick="@(() => FillForm("sme.nguyen@edunexus.vn", "sme123"))">SME</button>
-                    <button class="btn btn-sm btn-outline-success" style="font-size: 0.75rem;" @onclick="@(() => FillForm("student.le@edunexus.vn", "student123"))">Student (Lê)</button>
+            @if (string.IsNullOrWhiteSpace(GoogleClientId))
+            {
+                <div class="alert alert-warning small mb-0">Google Client ID chưa được cấu hình trên máy này.</div>
+            }
+            else
+            {
+                <div data-google-signin data-client-id="@GoogleClientId" data-login-uri="@GoogleLoginUri">
+                    <div data-google-fallback>
+                        <button type="button" class="btn btn-outline-dark w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
+                                onclick="window.eduNexusGoogleSignIn.start(this.closest('[data-google-signin]'))">
+                            <i class="bi bi-google"></i><span>Tiếp tục với Google</span>
+                        </button>
+                        <p class="small text-muted text-center mt-2 mb-0" data-google-status>Đang tải Google Sign-In…</p>
+                    </div>
+                    <div data-google-official-button class="d-flex justify-content-center"></div>
                 </div>
-            </div>
+            }
 
+            <p class="text-center small text-muted mt-4 mb-0">Chưa có tài khoản? <a href="/register" class="fw-semibold">Đăng ký ngay</a></p>
+
+            <section class="mt-5 p-3 rounded-3" style="background: var(--lms-surface); border: 1px dashed var(--lms-border);">
+                <p class="small text-muted mb-2 text-center fw-semibold">Tài khoản demo</p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick='@(() => FillForm("admin@edunexus.vn", "admin123"))'>Admin</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick='@(() => FillForm("sme.nguyen@edunexus.vn", "sme123"))'>SME</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" @onclick='@(() => FillForm("student.le@edunexus.vn", "student123"))'>Student</button>
+                </div>
+            </section>
         </div>
-    </div>
+    </main>
 </div>
 
 @code {
-    private string email = "";
-    private string password = "";
-    private string errorMessage = "";
-    private bool isLoading = false;
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
 
-    private void FillForm(string e, string p)
+    private string email = string.Empty;
+    private string password = string.Empty;
+    private string? errorMessage;
+    private bool isLoading;
+    private string GoogleClientId => Configuration["Authentication:Google:ClientId"] ?? string.Empty;
+    private string GoogleLoginUri => $"{NavManager.BaseUri.TrimEnd('/')}/auth/google-token";
+
+    protected override void OnParametersSet()
     {
-        email = e;
-        password = p;
-        errorMessage = "";
+        errorMessage = Error switch
+        {
+            "google_not_configured" => "Google Sign-In chưa có Client ID trên máy chủ. Vui lòng cấu hình Client ID rồi thử lại.",
+            "google_auth_failed" => "Google không xác thực được tài khoản này. Vui lòng thử lại.",
+            "no_email" => "Google không cung cấp email cho tài khoản này.",
+            _ => null
+        };
+    }
+
+    private void FillForm(string selectedEmail, string selectedPassword)
+    {
+        email = selectedEmail;
+        password = selectedPassword;
+        errorMessage = null;
     }
 
     private async Task HandleLogin()
     {
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        isLoading = true;
+        errorMessage = null;
+        if (!await Session.LoginWithEmailAsync(email, password))
         {
-            errorMessage = "Vui lòng nhập đầy đủ Email và Mật khẩu.";
+            errorMessage = "Email hoặc mật khẩu không chính xác.";
+            isLoading = false;
             return;
         }
 
-        isLoading = true;
-        errorMessage = "";
-        
-        // Gọi Auth Service
-        bool success = await Session.LoginWithEmailAsync(email, password);
-        
-        if (success)
-        {
-            // Redirect dựa theo role
-            var role = Session.CurrentRole?.Name;
-            var target = role switch
-            {
-                "SME" or "Teacher" => "/courses",
-                _ => "/dashboard"
-            };
-            NavManager.NavigateTo(target, forceLoad: true);
-        }
-        else
-        {
-            errorMessage = "Email hoặc Mật khẩu không chính xác.";
-            isLoading = false;
-        }
+        var destination = Session.IsInRole("SME", "Teacher", "CourseManager") ? "/courses" : "/dashboard";
+        NavManager.NavigateTo(destination, forceLoad: true);
     }
-
-
 }

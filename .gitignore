@@ -16,7 +16,9 @@ coverage/
 *.coverage
 *.trx
 
-# Local configuration and secrets (commit appsettings.json without secrets)
+# Local configuration and secrets. Existing tracked files must be removed from
+# Git's index once with: git rm --cached path/to/appsettings.Development.json.
+# Use appsettings.Development.example.json as the safe team template.
 **/appsettings.Development.json
 **/appsettings.Local.json
 **/secrets.json
