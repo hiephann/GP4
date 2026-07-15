@@ -1,9 +1,12 @@
 using EduNexus.Api.Infrastructure;
+using EduNexus.Api.Infrastructure.Ai;
 using EduNexus.Api.Question.DTOs;
 using EduNexus.Api.Question.Entities;
 using EduNexus.Api.Question.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
+using System.Text.Json;
 
 namespace EduNexus.Api.Question.Services;
 
@@ -22,11 +25,13 @@ public class QuestionService : IQuestionService
 {
     private readonly IQuestionRepository _questions;
     private readonly EduNexusDbContext _db;
+    private readonly IAiContentService _ai;
 
-    public QuestionService(IQuestionRepository questions, EduNexusDbContext db)
+    public QuestionService(IQuestionRepository questions, EduNexusDbContext db, IAiContentService ai)
     {
         _questions = questions;
         _db = db;
+        _ai = ai;
     }
 
     public async Task<List<QuestionListItemDto>> SearchAsync(QuestionFilter filter, CancellationToken ct = default)
@@ -93,19 +98,72 @@ public class QuestionService : IQuestionService
     {
         // TODO: Cần cài đặt thư viện EPPlus hoặc ClosedXML để đọc file stream ở đây.
         // Tạm thời trả về Mock result để không văng Exception
+        if (moduleId == Guid.Empty) throw new ArgumentException("Chưa chọn module nhận câu hỏi.");
+        if (file is null || file.Length == 0) throw new ArgumentException("Vui lòng chọn file Excel có dữ liệu.");
+        if (!Path.GetExtension(file.FileName).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Chỉ hỗ trợ file .xlsx theo template import.");
+
+        ExcelPackage.License.SetNonCommercialPersonal("EduNexus Demo");
         var errors = new List<ImportRowResult>();
-        return new ImportResultDto(0, 0, 0, errors);
+        var total = 0;
+        var success = 0;
+        await using var stream = file.OpenReadStream();
+        using var package = new ExcelPackage(stream);
+        var sheet = package.Workbook.Worksheets.FirstOrDefault()
+            ?? throw new ArgumentException("File Excel không có worksheet nào.");
+
+        for (var row = 2; row <= (sheet.Dimension?.End.Row ?? 0); row++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var content = sheet.Cells[row, 1].Text.Trim();
+            if (content.Length == 0) continue;
+            total++;
+            try
+            {
+                var options = Enumerable.Range(2, 4).Select(c => sheet.Cells[row, c].Text.Trim())
+                    .Where(text => text.Length > 0).ToList();
+                var correct = sheet.Cells[row, 6].Text.Trim().ToUpperInvariant();
+                var explanation = sheet.Cells[row, 7].Text.Trim();
+                var difficulty = sheet.Cells[row, 8].Text.Trim();
+                if (options.Count < 2) throw new ArgumentException("Cần tối thiểu 2 đáp án ở cột B:E.");
+                if (correct.Length != 1 || correct[0] < 'A' || correct[0] > 'D')
+                    throw new ArgumentException("CorrectOption phải là A, B, C hoặc D.");
+                var correctIndex = correct[0] - 'A';
+                if (correctIndex >= options.Count) throw new ArgumentException("Đáp án đúng không có nội dung tương ứng.");
+                if (difficulty.Length == 0) difficulty = "Medium";
+                if (difficulty is not ("Easy" or "Medium" or "Hard"))
+                    throw new ArgumentException("Difficulty phải là Easy, Medium hoặc Hard.");
+
+                _db.Questions.Add(new Entities.Question
+                {
+                    Id = Guid.NewGuid(), ModuleId = moduleId, Content = content,
+                    Explanation = explanation.Length == 0 ? null : explanation, Difficulty = difficulty,
+                    Status = "Active", CreatedAt = DateTime.UtcNow,
+                    Options = options.Select((text, index) => new QuestionOption
+                    { Id = Guid.NewGuid(), Content = text, IsCorrect = index == correctIndex, OrderIndex = index + 1 }).ToList()
+                });
+                success++;
+            }
+            catch (ArgumentException ex) { errors.Add(new ImportRowResult(row, false, ex.Message)); }
+        }
+        await _db.SaveChangesAsync(ct);
+        return new ImportResultDto(total, success, total - success, errors);
     }
 
     public async Task<AiQuestionDraftDto> GenerateDraftAsync(GenerateQuestionRequest request, Guid smeId, CancellationToken ct = default)
     {
+        if (request.ModuleId == Guid.Empty || string.IsNullOrWhiteSpace(request.SourceText))
+            throw new ArgumentException("Module và nội dung nguồn là bắt buộc để AI sinh câu hỏi.");
+        var ai = await _ai.GenerateQuestionsAsync(request.SourceText.Trim(), ct);
+        ValidateAiQuestionJson(ai.Text);
+
         var draft = new AiQuestionDraft
         {
             Id = Guid.NewGuid(),
             ModuleId = request.ModuleId,
             CreatedById = smeId,
             SourceText = request.SourceText,
-            GeneratedJson = "[{\"q\":\"Câu hỏi AI sinh ra?\",\"options\":[\"A\",\"B\",\"C\",\"D\"],\"answer\":0}]",
+            GeneratedJson = ai.Text,
             Status = "Pending",
             CreatedAt = DateTime.UtcNow
         };
@@ -119,12 +177,37 @@ public class QuestionService : IQuestionService
     public async Task ApproveDraftAsync(Guid draftId, CancellationToken ct = default)
     {
         var draft = await _db.AiQuestionDrafts.FindAsync(new object[] { draftId }, ct);
-        if (draft != null && draft.Status == "Pending")
+        if (draft is null || draft.Status != "Pending") return;
+        if (draft.ModuleId is null || string.IsNullOrWhiteSpace(draft.GeneratedJson))
+            throw new ArgumentException("Bản nháp AI không có module hoặc nội dung hợp lệ.");
+
+        using var json = JsonDocument.Parse(draft.GeneratedJson);
+        foreach (var item in json.RootElement.EnumerateArray())
         {
-            draft.Status = "Approved";
-            await _db.SaveChangesAsync(ct);
-            // Sau này bạn có thể bổ sung đoạn code parse JSON từ bản nháp
-            // rồi Insert vào bảng Questions tại đây.
+            var content = item.GetProperty("content").GetString()?.Trim();
+            var options = item.GetProperty("options").EnumerateArray().Select((option, index) => new QuestionOption
+            {
+                Id = Guid.NewGuid(), Content = option.GetProperty("content").GetString()?.Trim() ?? string.Empty,
+                IsCorrect = option.GetProperty("isCorrect").GetBoolean(), OrderIndex = index + 1
+            }).ToList();
+            if (string.IsNullOrWhiteSpace(content) || options.Count < 2 || options.Count(o => o.IsCorrect) != 1)
+                throw new ArgumentException("Dữ liệu AI có câu hỏi không hợp lệ; hãy chỉnh bản nháp trước khi duyệt.");
+
+            _db.Questions.Add(new Entities.Question
+            {
+                Id = Guid.NewGuid(), ModuleId = draft.ModuleId.Value, Content = content,
+                Explanation = item.TryGetProperty("explanation", out var explanation) ? explanation.GetString() : null,
+                Difficulty = item.TryGetProperty("difficulty", out var difficulty) ? difficulty.GetString() ?? "Medium" : "Medium",
+                Status = "Active", CreatedAt = DateTime.UtcNow, Options = options
+            });
         }
+        draft.Status = "Approved";
+        await _db.SaveChangesAsync(ct);
+    }
+    private static void ValidateAiQuestionJson(string value)
+    {
+        using var json = JsonDocument.Parse(value);
+        if (json.RootElement.ValueKind != JsonValueKind.Array || json.RootElement.GetArrayLength() == 0)
+            throw new ArgumentException("AI không trả về mảng câu hỏi hợp lệ.");
     }
 }

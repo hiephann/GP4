@@ -22,6 +22,18 @@ public class GeminiAiContentService : IAiContentService
         "gồm: một đoạn tổng quan ngắn, danh sách các ý chính theo thứ tự xuất hiện, và các thuật ngữ quan trọng. " +
         "Chỉ trả về Markdown, không thêm lời dẫn.";
 
+    private const string QuestionSystemPrompt =
+        "Bạn là chuyên gia giáo dục của nền tảng EduNexus. " +
+        "Từ văn bản nguồn được cung cấp, hãy sinh ra 5 câu hỏi trắc nghiệm bằng tiếng Việt. " +
+        "Chỉ trả về MỘT mảng JSON hợp lệ, KHÔNG bọc trong markdown block (```json). " +
+        "Cấu trúc mỗi object: { \"content\": \"Nội dung câu hỏi\", \"explanation\": \"Giải thích\", \"difficulty\": \"Medium\", \"options\": [ { \"content\": \"Đáp án A\", \"isCorrect\": true }, ... ] }.";
+
+    private const string FlashcardSystemPrompt =
+        "Bạn là chuyên gia giáo dục của nền tảng EduNexus. " +
+        "Từ văn bản nguồn được cung cấp, hãy sinh ra 10 flashcard (thẻ ghi nhớ) bằng tiếng Việt. " +
+        "Chỉ trả về MỘT mảng JSON hợp lệ, KHÔNG bọc trong markdown block (```json). " +
+        "Cấu trúc mỗi object: { \"frontText\": \"Thuật ngữ (mặt trước)\", \"backText\": \"Định nghĩa (mặt sau)\" }.";
+
     private readonly HttpClient _http;
     private readonly AiOptions.GeminiOptions _options;
     private readonly ILogger<GeminiAiContentService> _logger;
@@ -38,6 +50,12 @@ public class GeminiAiContentService : IAiContentService
 
     public Task<AiResult> SummarizeTranscriptAsync(string transcript, CancellationToken ct = default)
         => CallAsync(SummarySystemPrompt, $"Transcript:\n{transcript}", ct);
+
+    public Task<AiResult> GenerateQuestionsAsync(string sourceText, CancellationToken ct = default)
+        => CallAsync(QuestionSystemPrompt, $"Văn bản nguồn:\n{sourceText}", ct);
+
+    public Task<AiResult> GenerateFlashcardsAsync(string sourceText, CancellationToken ct = default)
+        => CallAsync(FlashcardSystemPrompt, $"Văn bản nguồn:\n{sourceText}", ct);
 
     private async Task<AiResult> CallAsync(string systemPrompt, string userPrompt, CancellationToken ct)
     {

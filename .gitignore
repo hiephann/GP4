@@ -1,13 +1,47 @@
-/01_EduNexus_VS_v2.pdf
-/02_EduNexus_SRS_v2.pdf
-/29_06_2026___fa5474fc-c976-4b45-91dd-4403e4feb140.xlsx
-/G5_GP1.zip
-1_PRD_Template.docx
-01_VS_v2.pdf
-2_Requirement Traceability2.xlsx
-02_SRS_v2.pdf
-3_Design_Modeling.docx
-*.docx
-*.xlsx
-*.txt
-read_docx.py
+# Build output and IDE state
+[Bb]in/
+[Oo]bj/
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET local tools and test output
+.dotnet_home/
+.data-protection/
+TestResults/
+coverage/
+*.coverage
+*.trx
+
+# Local configuration and secrets (commit appsettings.json without secrets)
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/secrets.json
+*.env
+*.env.*
+!.env.example
+
+# Local SQL Server files and backups
+*.mdf
+*.ndf
+*.ldf
+*.bak
+
+# User-specific AI/agent settings and temporary work
+.claude/
+.agents/
+tmp/
+temp/
+*.log
+*.pid
+
+# Packaged archives are release artifacts; keep source documents and SQL scripts tracked.
+*.zip
+
+# Reference submissions and archived work kept beside the active GP1 source.
+/Final project/
+/G5_GP6/
+/G5_2-Traceability.xlsx

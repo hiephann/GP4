@@ -2,6 +2,7 @@ using EduNexus.Api.Flashcard.DTOs;
 using EduNexus.Api.Flashcard.Entities;
 using EduNexus.Api.Flashcard.Repositories;
 using EduNexus.Api.Infrastructure;
+using EduNexus.Api.Infrastructure.Ai;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -10,10 +11,12 @@ namespace EduNexus.Api.Flashcard.Services;
 public class FlashcardService : IFlashcardService
 {
     private readonly EduNexusDbContext _db; // Inject trực tiếp DB Context để thao tác liên bảng phức tạp
+    private readonly IAiContentService _ai;
 
-    public FlashcardService(EduNexusDbContext db)
+    public FlashcardService(EduNexusDbContext db, IAiContentService ai)
     {
         _db = db;
+        _ai = ai;
     }
 
     #region Flashcard Editor (SME)
@@ -186,8 +189,15 @@ public class FlashcardService : IFlashcardService
 
     public async Task<AiFlashcardDraftDto> GenerateDraftAsync(GenerateFlashcardRequest request, Guid smeId, CancellationToken ct = default)
     {
-        // BR-07: Giả lập sinh thẻ tự động bằng GenAI (Trong thực tế bạn sẽ tích hợp HttpClient gọi dịch vụ OpenAI/Gemini tại đây)
-        var simulatedJsonResult = "[{\"front\":\"Thuật ngữ AI mẫu\",\"back\":\"Định nghĩa do AI phân tích tài liệu\"}]";
+        if (request.ModuleId == Guid.Empty || string.IsNullOrWhiteSpace(request.SourceText))
+            throw new ArgumentException("Module và nội dung nguồn là bắt buộc để AI sinh flashcard.");
+        // BR-07: service returns a real Gemini result when configured, otherwise the explicitly-labelled fallback.
+        var ai = await _ai.GenerateFlashcardsAsync(request.SourceText.Trim(), ct);
+        using (var generated = JsonDocument.Parse(ai.Text))
+        {
+            if (generated.RootElement.ValueKind != JsonValueKind.Array || generated.RootElement.GetArrayLength() == 0)
+                throw new ArgumentException("AI không trả về mảng flashcard hợp lệ.");
+        }
 
         var draft = new AiFlashcardDraft
         {
@@ -195,7 +205,7 @@ public class FlashcardService : IFlashcardService
             ModuleId = request.ModuleId,
             CreatedById = smeId,
             SourceText = request.SourceText,
-            GeneratedJson = simulatedJsonResult,
+            GeneratedJson = ai.Text,
             Status = "Pending",
             CreatedAt = DateTime.UtcNow
         };
@@ -227,8 +237,13 @@ public class FlashcardService : IFlashcardService
             foreach (var item in root.EnumerateArray())
             {
                 maxOrder++;
-                var front = item.GetProperty("front").GetString() ?? "";
-                var back = item.GetProperty("back").GetString() ?? "";
+                // Accept the old draft shape too, so existing demo records remain reviewable.
+                var front = item.TryGetProperty("frontText", out var frontText)
+                    ? frontText.GetString() ?? "" : item.GetProperty("front").GetString() ?? "";
+                var back = item.TryGetProperty("backText", out var backText)
+                    ? backText.GetString() ?? "" : item.GetProperty("back").GetString() ?? "";
+                if (string.IsNullOrWhiteSpace(front) || string.IsNullOrWhiteSpace(back) || front.Length > 500)
+                    throw new ArgumentException("Dữ liệu AI có flashcard không hợp lệ; hãy chỉnh bản nháp trước khi duyệt.");
 
                 var newCard = new FlashcardItem
                 {

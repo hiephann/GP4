@@ -15,6 +15,9 @@ using EduNexus.Api.Quiz.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 // ----- DbContext (SQL Server) -----
 builder.Services.AddDbContext<EduNexusDbContext>(options =>

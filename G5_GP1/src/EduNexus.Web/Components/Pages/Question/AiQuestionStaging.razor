@@ -1,5 +1,6 @@
 @page "/ai-question-staging"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject EduNexus.Api.Question.Services.IQuestionService QuestionService
 
 <PageTitle>AI Question Staging</PageTitle>
 
@@ -16,9 +17,28 @@
             <i class="bi bi-magic me-2"></i>Cung cấp văn bản nguồn cho AI
         </label>
         <textarea class="form-control bg-light border-0 mb-3" rows="4" @bind="source" placeholder="Dán nội dung bài học, tài liệu hoặc đoạn văn vào đây..."></textarea>
+        <select class="form-select mb-3" @bind="moduleId">
+            <option value="">-- Chọn module nhận câu hỏi sau khi duyệt --</option>
+            @if (modules is not null)
+            {
+                @foreach (var module in modules)
+                {
+                    <option value="@module.Id">@module.Title</option>
+                }
+            }
+        </select>
         <div class="d-flex justify-content-end">
-            <button class="btn btn-primary rounded-pill px-4 shadow-sm" @onclick="Generate" disabled="@string.IsNullOrWhiteSpace(source)">
-                <i class="bi bi-robot me-2"></i>Sinh câu hỏi
+            <button class="btn btn-primary rounded-pill px-4 shadow-sm" @onclick="Generate" disabled="@(string.IsNullOrWhiteSpace(source) || isGenerating)">
+                @if (isGenerating)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Đang sinh câu hỏi...</span>
+                }
+                else
+                {
+                    <i class="bi bi-robot me-2"></i>
+                    <span>Sinh câu hỏi</span>
+                }
             </button>
         </div>
     </div>
@@ -85,6 +105,8 @@
 
 @code {
     private string source = "";
+    private string? moduleId;
+    private List<Module>? modules;
     private List<EduNexus.Api.Question.Entities.AiQuestionDraft>? drafts;
 
     protected override async Task OnInitializedAsync() => await Load();
@@ -93,36 +115,36 @@
     {
         using var db = await DbFactory.CreateDbContextAsync();
         drafts = await db.AiQuestionDrafts.OrderByDescending(d => d.CreatedAt).ToListAsync();
+        modules = await db.Modules.OrderBy(m => m.OrderIndex).ThenBy(m => m.Title).ToListAsync();
     }
+
+    [Inject] private EduNexus.Api.Infrastructure.Ai.IAiContentService AiService { get; set; } = default!;
+    private bool isGenerating = false;
 
     private async Task Generate()
     {
-        if (string.IsNullOrWhiteSpace(source)) return;
-        using var db = await DbFactory.CreateDbContextAsync();
-        var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
-        db.AiQuestionDrafts.Add(new EduNexus.Api.Question.Entities.AiQuestionDraft
+        if (string.IsNullOrWhiteSpace(source) || !Guid.TryParse(moduleId, out var targetModuleId)) return;
+        isGenerating = true;
+        StateHasChanged();
+
+        try
         {
-            Id = Guid.NewGuid(),
-            CreatedById = anyUser ?? Guid.Empty,
-            SourceText = source,
-            GeneratedJson = "[{\"q\":\"Câu hỏi demo từ AI?\",\"options\":[\"A\",\"B\",\"C\",\"D\"],\"answer\":0}]",
-            Status = "Pending",
-            CreatedAt = DateTime.UtcNow
-        });
-        await db.SaveChangesAsync();
-        source = "";
-        await Load();
+            using var db = await DbFactory.CreateDbContextAsync();
+            var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
+            await QuestionService.GenerateDraftAsync(
+                new EduNexus.Api.Question.DTOs.GenerateQuestionRequest(targetModuleId, source, 5), anyUser ?? Guid.Empty);
+            source = "";
+        }
+        finally
+        {
+            isGenerating = false;
+            await Load();
+        }
     }
 
     private async Task Approve(Guid id)
     {
-        using var db = await DbFactory.CreateDbContextAsync();
-        var d = await db.AiQuestionDrafts.FindAsync(id);
-        if (d != null && d.Status == "Pending")
-        {
-            d.Status = "Approved";
-            await db.SaveChangesAsync();
-        }
+        await QuestionService.ApproveDraftAsync(id);
         await Load();
     }
 }

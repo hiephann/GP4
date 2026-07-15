@@ -45,6 +45,7 @@ public class UserSession
         finally
         {
             _isInitialized = true;
+            OnChange?.Invoke();
         }
     }
 
@@ -64,6 +65,7 @@ public class UserSession
                 { "admin@edunexus.vn", "admin123" },
                 { "sme.nguyen@edunexus.vn", "sme123" },
                 { "teacher.tran@edunexus.vn", "teacher123" },
+                { "manager.do@edunexus.vn", "manager123" },
                 { "student.le@edunexus.vn", "student123" },
                 { "student.pham@edunexus.vn", "student123" },
                 { "student.hoang@edunexus.vn", "student123" },

@@ -4,14 +4,31 @@ using EduNexus.Api.Infrastructure;
 using EduNexus.Api.Infrastructure.Ai;
 using EduNexus.Api.Lesson.Repositories;
 using EduNexus.Api.Lesson.Services;
+using EduNexus.Api.Question.Repositories;
+using EduNexus.Api.Question.Services;
 using EduNexus.Web.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
+// The Windows Event Log provider can make request handling fail when the app
+// is launched without permission to write the .NET Runtime event source.
+// Console/Debug logging is sufficient for local development and demo use.
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+// Keep development keys with the project instead of the current Windows
+// profile. This prevents stale DPAPI-encrypted keys from breaking Blazor
+// circuits when the app is launched by another local process/user.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, ".data-protection")))
+    .SetApplicationName("EduNexus.Web");
 builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
 builder.Services.AddScoped<IFlashcardService, FlashcardService>();
+builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
+builder.Services.AddScoped<IQuestionService, QuestionService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -23,13 +40,18 @@ builder.Services.AddDbContextFactory<EduNexusDbContext>(options =>
 
 builder.Services.AddScoped<EduNexus.Web.Services.UserSession>();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie()
-    .AddGoogle(options =>
+var authentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie();
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authentication.AddGoogle(options =>
     {
-        options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "mock-client-id";
-        options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "mock-client-secret";
+        options.ClientId = googleClientId;
+        options.ClientSecret = googleClientSecret;
     });
+}
 
 // Các repository nhận EduNexusDbContext theo scope — lấy từ factory ở trên.
 builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<EduNexusDbContext>>().CreateDbContext());

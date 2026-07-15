@@ -13,15 +13,21 @@ namespace EduNexus.Web.Controllers;
 public class AuthController : Controller
 {
     private readonly IDbContextFactory<EduNexusDbContext> _dbFactory;
+    private readonly IConfiguration _configuration;
 
-    public AuthController(IDbContextFactory<EduNexusDbContext> dbFactory)
+    public AuthController(IDbContextFactory<EduNexusDbContext> dbFactory, IConfiguration configuration)
     {
         _dbFactory = dbFactory;
+        _configuration = configuration;
     }
 
     [HttpGet("google")]
     public IActionResult LoginGoogle()
     {
+        if (string.IsNullOrWhiteSpace(_configuration["Authentication:Google:ClientId"]) ||
+            string.IsNullOrWhiteSpace(_configuration["Authentication:Google:ClientSecret"]))
+            return Redirect("/login?error=google_not_configured");
+
         var properties = new AuthenticationProperties { RedirectUri = Url.Action("GoogleCallback") };
         return Challenge(properties, GoogleDefaults.AuthenticationScheme);
     }

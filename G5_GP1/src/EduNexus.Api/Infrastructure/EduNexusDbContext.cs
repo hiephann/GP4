@@ -97,6 +97,12 @@ public class EduNexusDbContext : DbContext
         b.Entity<FlashcardProgress>().HasIndex(x => new { x.FlashcardId, x.StudentId }).IsUnique();
         b.Entity<LessonProgress>().HasIndex(x => new { x.LessonId, x.StudentId }).IsUnique();
 
+        // Fix shadow properties (Entity name mismatch with FK name)
+        b.Entity<FlashcardGroup>().HasMany(g => g.Flashcards).WithOne().HasForeignKey(f => f.GroupId);
+        b.Entity<AssignmentItem>().HasMany(a => a.Criteria).WithOne().HasForeignKey(c => c.AssignmentId);
+        b.Entity<QuizItem>().HasMany(q => q.Questions).WithOne().HasForeignKey(qq => qq.QuizId);
+        b.Entity<QuizAttempt>().HasMany(q => q.Answers).WithOne().HasForeignKey(a => a.AttemptId);
+
         base.OnModelCreating(b);
     }
 }

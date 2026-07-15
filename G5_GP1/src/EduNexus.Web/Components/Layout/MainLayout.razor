@@ -54,7 +54,18 @@
         <main class="lms-content">
             <ErrorBoundary @ref="errorBoundary">
                 <ChildContent>
-                    @Body
+                    @if (!Session.IsInitialized)
+                    {
+                        <div class="d-flex justify-content-center align-items-center mt-5">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @Body
+                    }
                 </ChildContent>
                 <ErrorContent Context="ex">
                     <div class="alert alert-danger m-4" role="alert">

@@ -16,4 +16,10 @@ public interface IAiContentService
 
     /// <summary>Lesson Text Extract — tóm tắt transcript video thành lesson summary (AC-02f).</summary>
     Task<AiResult> SummarizeTranscriptAsync(string transcript, CancellationToken ct = default);
+
+    /// <summary>AI Question Staging — sinh câu hỏi trắc nghiệm (FT-03).</summary>
+    Task<AiResult> GenerateQuestionsAsync(string sourceText, CancellationToken ct = default);
+
+    /// <summary>AI Flashcard Staging — sinh flashcards (FT-04).</summary>
+    Task<AiResult> GenerateFlashcardsAsync(string sourceText, CancellationToken ct = default);
 }

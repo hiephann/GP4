@@ -69,7 +69,6 @@ public class FakeAiContentService : IAiContentService
         md.AppendLine();
         md.AppendLine("## Các ý chính");
 
-        // Lấy mẫu đều trên toàn transcript để bản tóm tắt trải hết video, không dồn vào phần đầu.
         foreach (var s in Sample(sentences, 6))
             md.AppendLine($"- {Truncate(s, 180)}");
 
@@ -79,6 +78,20 @@ public class FakeAiContentService : IAiContentService
         var text = md.ToString();
         sw.Stop();
         return Task.FromResult(new AiResult(text, text.Length / CharsPerToken, (int)sw.ElapsedMilliseconds, "Mock"));
+    }
+
+    public async Task<AiResult> GenerateQuestionsAsync(string sourceText, CancellationToken ct = default)
+    {
+        await Task.Delay(1000, ct);
+        var res = "[{\"content\":\"Câu hỏi giả lập?\",\"explanation\":\"Giải thích\",\"difficulty\":\"Medium\",\"options\":[{\"content\":\"A\",\"isCorrect\":true},{\"content\":\"B\",\"isCorrect\":false}]}]";
+        return new AiResult(res, 100, 1000, "Fake/Question");
+    }
+
+    public async Task<AiResult> GenerateFlashcardsAsync(string sourceText, CancellationToken ct = default)
+    {
+        await Task.Delay(1000, ct);
+        var res = "[{\"frontText\":\"Mặt trước giả lập\",\"backText\":\"Mặt sau giả lập\"}]";
+        return new AiResult(res, 80, 1000, "Fake/Flashcard");
     }
 
     private static List<string> SplitIntoPoints(string outline)
