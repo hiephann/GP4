@@ -12,7 +12,13 @@
     <label class="form-label">Chọn module</label>
     <select class="form-select lms-input" @onchange="OnModuleChanged">
         <option value="">-- chọn --</option>
-        @if (modules is not null) { @foreach (var m in modules) { <option value="@m.Id">@m.Title</option> } }
+        @if (modules is not null)
+        {
+            @foreach (var m in modules)
+            {
+                <option value="@m.Id">@m.Title</option>
+            }
+        }
     </select>
 </div>
 
@@ -23,10 +29,12 @@
             <div class="card">
                 <div class="card-header">Nhóm thẻ</div>
                 <div class="list-group list-group-flush">
-                    @foreach (var g in groups!)
+                    @foreach (var g in groups)
                     {
-                        <button class="list-group-item list-group-item-action @(g.Id==currentGroup?.Id?"active":"")"
-                                @onclick="() => SelectGroup(g)">@g.Name</button>
+                        <button class="list-group-item list-group-item-action @(g.Id == currentGroup?.Id ? "active" : "")"
+                                @onclick="() => SelectGroup(g)">
+                            @g.Name
+                        </button>
                     }
                 </div>
                 <div class="card-body d-flex gap-2">
@@ -48,8 +56,14 @@
                 <table class="table lms-table table-sm">
                     <thead><tr><th>Thuật ngữ</th><th>Định nghĩa</th></tr></thead>
                     <tbody>
-                        @foreach (var c in cards!) { <tr><td>@c.FrontText</td><td>@c.BackText</td></tr> }
-                        @if (cards.Count == 0) { <tr><td colspan="2" class="text-muted">Chưa có thẻ.</td></tr> }
+                        @foreach (var c in cards)
+                        {
+                            <tr><td>@c.FrontText</td><td>@c.BackText</td></tr>
+                        }
+                        @if (cards.Count == 0)
+                        {
+                            <tr><td colspan="2" class="text-muted">Chưa có thẻ.</td></tr>
+                        }
                     </tbody>
                 </table>
             }
@@ -60,9 +74,9 @@
 @code {
     private List<Module>? modules;
     private Guid? selectedModule;
-    private List<FlashcardGroup>? groups;
+    private List<FlashcardGroup> groups = new();
     private FlashcardGroup? currentGroup;
-    private List<FlashcardItem>? cards;
+    private List<FlashcardItem> cards = new();
     private string newGroupName = "", front = "", back = "";
 
     protected override async Task OnInitializedAsync()
@@ -74,31 +88,27 @@
     private async Task OnModuleChanged(ChangeEventArgs e)
     {
         selectedModule = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
-        currentGroup = null; cards = null;
+        currentGroup = null;
+        cards = new(); // 🟢 SỬA: Thay cards = null thành cards = new()
         await LoadGroups();
     }
 
     private async Task LoadGroups()
     {
-        if (selectedModule is null) { groups = null; return; }
+        if (selectedModule is null)
+        {
+            groups = new(); // 🟢 SỬA: Thay groups = null thành groups = new()
+            return;
+        }
         using var db = await DbFactory.CreateDbContextAsync();
         groups = await db.FlashcardGroups.Where(g => g.ModuleId == selectedModule).OrderBy(g => g.OrderIndex).ToListAsync();
     }
 
-    private async Task AddGroup()
-    {
-        if (selectedModule is null || string.IsNullOrWhiteSpace(newGroupName)) return;
-        using var db = await DbFactory.CreateDbContextAsync();
-        var order = await db.FlashcardGroups.CountAsync(g => g.ModuleId == selectedModule) + 1;
-        db.FlashcardGroups.Add(new FlashcardGroup { Id = Guid.NewGuid(), ModuleId = selectedModule.Value, Name = newGroupName.Trim(), OrderIndex = order, CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-        newGroupName = "";
-        await LoadGroups();
-    }
-
     private async Task SelectGroup(FlashcardGroup g)
     {
+        cards = new(); // 🟢 SỬA: Reset danh sách rỗng trước để tránh lỗi render bất đồng bộ
         currentGroup = g;
+
         using var db = await DbFactory.CreateDbContextAsync();
         cards = await db.Flashcards.Where(c => c.GroupId == g.Id).OrderBy(c => c.OrderIndex).ToListAsync();
     }
@@ -112,5 +122,16 @@
         await db.SaveChangesAsync();
         front = back = "";
         await SelectGroup(currentGroup);
+    }
+
+    private async Task AddGroup()
+    {
+        if (selectedModule is null || string.IsNullOrWhiteSpace(newGroupName)) return;
+        using var db = await DbFactory.CreateDbContextAsync();
+        var order = await db.FlashcardGroups.CountAsync(g => g.ModuleId == selectedModule) + 1;
+        db.FlashcardGroups.Add(new FlashcardGroup { Id = Guid.NewGuid(), ModuleId = selectedModule.Value, Name = newGroupName.Trim(), OrderIndex = order, CreatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+        newGroupName = "";
+        await LoadGroups();
     }
 }
