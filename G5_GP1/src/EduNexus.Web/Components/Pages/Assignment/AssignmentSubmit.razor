@@ -12,7 +12,15 @@
 </div>
 
 <!-- Step Flow Navigator -->
-<div class="lms-step-flow">
+@if (Session.IsInRole("Student"))
+{
+    <div class="lms-step-flow">
+        <a class="step active" href="assignment-submit"><i class="bi bi-upload"></i> 1. Nộp bài</a>
+        <div class="step-divider"></div>
+        <a class="step" href="assignment-result"><i class="bi bi-clipboard-check"></i> 2. Kết quả</a>
+    </div>
+}
+<div class="lms-step-flow d-none">
     <a class="step completed" href="assignments">
         <i class="bi bi-check-circle-fill"></i> 1. Tạo Bài Tập
     </a>
