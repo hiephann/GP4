@@ -3,8 +3,7 @@
 @implements IDisposable
 
 <div class="p-3 d-flex align-items-center gap-2 border-bottom" style="height: 64px; border-color: var(--lms-border);">
-    <div class="d-flex align-items-center justify-content-center rounded-2" 
-         style="width: 32px; height: 32px; background: var(--lms-primary-gradient); color: white; font-size: 1.1rem;">
+    <div class="d-flex align-items-center justify-content-center rounded-2" style="width: 32px; height: 32px; background: var(--lms-primary-gradient); color: white; font-size: 1.1rem;">
         <i class="bi bi-mortarboard-fill"></i>
     </div>
     <span class="fw-bold fs-5 text-dark">EduNexus <span style="color: var(--lms-primary);">G5</span></span>
@@ -12,76 +11,73 @@
 
 <div class="nav-scrollable flex-grow-1 overflow-auto py-2" style="background: var(--lms-surface);">
     <nav class="flex-column mb-4">
-        <!-- Main Dashboard Link -->
         <div class="nav-item px-3 mb-2">
-            <NavLink class="nav-link d-flex align-items-center gap-2 py-2 px-3 rounded-2 text-dark fw-medium" 
-                     href="" Match="NavLinkMatch.All" style="transition: all 0.2s;">
+            <NavLink class="nav-link d-flex align-items-center gap-2 py-2 px-3 rounded-2 text-dark fw-medium" href="" Match="NavLinkMatch.All" style="transition: all 0.2s;">
                 <i class="bi bi-grid-1x2-fill fs-5" style="color: var(--lms-primary);"></i> Trang Chủ
             </NavLink>
         </div>
 
         <div class="nav-item px-3 mb-2">
             <NavItem Href="profile" Icon="bi-person-circle" Text="Hồ sơ cá nhân" />
-        
-            @if (Session.CurrentRole?.Name == "Admin")
+            @if (Session.IsInRole("Admin"))
             {
                 <div class="nav-item-divider my-2 border-bottom" style="border-color: rgba(0,0,0,0.1) !important"></div>
-                <NavItem Href="role-approval" Icon="bi-shield-check" Text="Duyệt tài khoản (Admin)" />
+                <NavItem Href="role-approval" Icon="bi-shield-check" Text="Duyệt tài khoản" />
             }
         </div>
 
-        @if (Session.CurrentRole?.Name == "Student")
+        @if (Session.IsInRole("Student"))
         {
-            <!-- Student Workspace -->
             <div class="nav-group-title mt-3">Khu vực Học tập</div>
             <NavItem Href="dashboard" Icon="bi-speedometer2" Text="Bảng điều khiển" />
             <NavItem Href="progress" Icon="bi-graph-up" Text="Tiến độ học tập" />
-            
+
             <div class="nav-group-title mt-3">Thực hành & Ôn tập</div>
             <NavItem Href="flashcard-library" Icon="bi-stack" Text="Thư viện Flashcard" />
             <NavItem Href="flashcard-practice" Icon="bi-arrow-repeat" Text="Luyện tập Flashcard" />
-            <NavItem Href="assignment-submit" Icon="bi-cloud-arrow-up" Text="Nộp bài tập (Assignment)" />
+            <NavItem Href="assignment-submit" Icon="bi-cloud-arrow-up" Text="Nộp bài tập" />
             <NavItem Href="assignment-result" Icon="bi-clipboard-check" Text="Kết quả Assignment" />
-            
+
             <div class="nav-group-title mt-3">Kiểm tra (Quiz)</div>
             <NavItem Href="quiz-taking" Icon="bi-ui-checks" Text="Làm bài thi" />
             <NavItem Href="quiz-history" Icon="bi-clock-history" Text="Lịch sử làm bài" />
         }
-        @if (Session.CurrentRole?.Name == "SME" || Session.CurrentRole?.Name == "Teacher" || Session.CurrentRole?.Name == "CourseManager" || Session.CurrentRole?.Name == "Admin")
+
+        @if (Session.IsInRole("SME", "CourseManager", "Admin"))
         {
-            <!-- SME / Teacher Workspace -->
             <div class="nav-group-title mt-3">Quản lý Khóa học</div>
             <NavItem Href="courses" Icon="bi-collection-play" Text="Danh sách Khóa học" />
             <NavItem Href="course-structure" Icon="bi-diagram-3" Text="Cấu trúc Nội dung" />
-            
+
             <div class="nav-group-title mt-3">Soạn thảo Nội dung</div>
             <NavItem Href="lesson-editor" Icon="bi-pencil-square" Text="Chỉnh sửa Bài giảng" />
             <NavItem Href="flashcard-editor" Icon="bi-card-heading" Text="Quản lý Flashcard" />
             <NavItem Href="question-bank" Icon="bi-question-square" Text="Ngân hàng Câu hỏi" />
-            <NavItem Href="assignments" Icon="bi-list-task" Text="Quản lý Assignment" />
-            
+
             <div class="nav-group-title mt-3">Công cụ AI Staging</div>
             <NavItem Href="ai-lesson-staging" Icon="bi-robot" Text="AI: Sinh Bài giảng" />
             <NavItem Href="lesson-text-extract" Icon="bi-file-earmark-break" Text="AI: Trích xuất Video" />
             <NavItem Href="ai-flashcard-staging" Icon="bi-robot" Text="AI: Sinh Flashcard" />
             <NavItem Href="ai-question-staging" Icon="bi-robot" Text="AI: Sinh Câu hỏi" />
-            
-            <div class="nav-group-title mt-3">Công cụ Kiểm tra</div>
-            <NavItem Href="new-quiz" Icon="bi-plus-circle" Text="Tạo bài thi mới" />
-            <NavItem Href="assignment-detail" Icon="bi-file-earmark-text" Text="Chấm điểm Assignment" />
         }
 
+        @if (Session.IsInRole("Admin", "Teacher", "CourseManager"))
+        {
+            <div class="nav-group-title mt-3">Quản lý Đánh giá</div>
+            <NavItem Href="assignments" Icon="bi-list-task" Text="Quản lý Assignment" />
+            <NavItem Href="assignment-result" Icon="bi-clipboard-check" Text="Chấm điểm Assignment" />
+        }
+
+        @if (Session.IsInRole("Admin", "Teacher"))
+        {
+            <div class="nav-group-title mt-3">Quản lý Quiz</div>
+            <NavItem Href="new-quiz" Icon="bi-plus-circle" Text="Tạo bài thi mới" />
+            <NavItem Href="quiz-history" Icon="bi-clock-history" Text="Theo dõi kết quả Quiz" />
+        }
     </nav>
 </div>
 
 @code {
-    protected override void OnInitialized()
-    {
-        Session.OnChange += StateHasChanged;
-    }
-
-    public void Dispose()
-    {
-        Session.OnChange -= StateHasChanged;
-    }
+    protected override void OnInitialized() => Session.OnChange += StateHasChanged;
+    public void Dispose() => Session.OnChange -= StateHasChanged;
 }

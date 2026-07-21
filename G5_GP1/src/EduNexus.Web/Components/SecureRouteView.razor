@@ -27,9 +27,10 @@ else if (!Session.IsInitialized)
         "AssignmentList" or "AssignmentDetail" => Session.IsInRole("Admin", "Teacher", "CourseManager"),
         "AssignmentResult" => Session.IsInRole("Admin", "Teacher", "CourseManager", "Student"),
         "FlashcardPractice" or "FlashcardLibrary" or "LessonView" or
-        "NewQuiz" or "QuizTaking" or "QuizResults" or "QuizHistory" or "QuizReview" or
-        "PersonalProgress" => Session.IsInRole("Student"),
-        "Dashboard" => Session.IsInRole("Admin", "SME", "Teacher", "CourseManager", "Student"),
+        "QuizTaking" or "PersonalProgress" => Session.IsInRole("Student"),
+        "NewQuiz" => Session.IsInRole("Admin", "Teacher"),
+        "QuizResults" or "QuizHistory" or "QuizReview" => Session.IsInRole("Admin", "Teacher", "Student"),
+        "Dashboard" => Session.IsInRole("Admin", "Student"),
         "AssignmentSubmit" => Session.IsInRole("Student"),
         "Profile" or "Home" => Session.IsLoggedIn,
         "RoleApproval" => Session.IsInRole("Admin"),

@@ -1,5 +1,6 @@
 @page "/lesson-view"
 @inject ILessonService Lessons
+@inject EduNexus.Web.Services.UserSession Session
 
 <PageTitle>Lesson View</PageTitle>
 
@@ -33,9 +34,9 @@
         </div>
         <div class="col-md-4">
             <label class="form-label small text-uppercase text-muted fw-bold">Học viên (mô phỏng đăng nhập)</label>
-            <select class="form-select lms-input" @onchange="OnStudentChanged">
+            <select class="form-select lms-input" value="@studentId" disabled>
                 <option value="">-- chọn học viên --</option>
-                @foreach (var u in users)
+                @foreach (var u in users.Where(u => u.Id == Session.CurrentUser?.Id))
                 {
                     <option value="@u.Id">@u.DisplayName</option>
                 }
@@ -124,6 +125,7 @@
     {
         modules = await Lessons.GetModuleOptionsAsync();
         users = await Lessons.GetUserOptionsAsync();
+        studentId = Session.CurrentUser?.Id;
     }
 
     private async Task OnModuleChanged(ChangeEventArgs e)

@@ -132,7 +132,9 @@
             return;
         }
 
-        var destination = Session.IsInRole("SME", "Teacher", "CourseManager") ? "/courses" : "/dashboard";
+        var destination = Session.IsInRole("Teacher") ? "/assignments"
+            : Session.IsInRole("SME", "CourseManager") ? "/courses"
+            : "/dashboard";
         NavManager.NavigateTo(destination, forceLoad: true);
     }
 }

@@ -44,7 +44,14 @@
     protected override async Task OnInitializedAsync()
     {
         using var db = await DbFactory.CreateDbContextAsync();
-        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+        students = await (from user in db.Users
+                          join userRole in db.UserRoles on user.Id equals userRole.UserId
+                          join role in db.Roles on userRole.RoleId equals role.Id
+                          where user.IsActive && role.Name == "Student"
+                          select user)
+            .Distinct()
+            .OrderBy(user => user.DisplayName)
+            .ToListAsync();
     }
 
     private async Task OnStudentChanged(ChangeEventArgs e)

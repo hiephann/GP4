@@ -50,7 +50,14 @@
     protected override async Task OnInitializedAsync()
     {
         using var db = await DbFactory.CreateDbContextAsync();
-        students = await db.Users.OrderBy(u => u.DisplayName).ToListAsync();
+        students = await (from user in db.Users
+                          join userRole in db.UserRoles on user.Id equals userRole.UserId
+                          join role in db.Roles on userRole.RoleId equals role.Id
+                          where user.IsActive && role.Name == "Student"
+                          select user)
+            .Distinct()
+            .OrderBy(user => user.DisplayName)
+            .ToListAsync();
         modules = await db.Modules.OrderBy(m => m.Title).ToListAsync();
     }
 
@@ -58,6 +65,17 @@
     {
         if (!Guid.TryParse(studentId, out var sid)) { message = "Chọn học viên."; return; }
         using var db = await DbFactory.CreateDbContextAsync();
+        var isStudent = await (from userRole in db.UserRoles
+                               join role in db.Roles on userRole.RoleId equals role.Id
+                               join user in db.Users on userRole.UserId equals user.Id
+                               where userRole.UserId == sid && user.IsActive && role.Name == "Student"
+                               select userRole)
+            .AnyAsync();
+        if (!isStudent)
+        {
+            message = "Chỉ có thể tạo Quiz cho tài khoản Học viên đang hoạt động.";
+            return;
+        }
 
         var q = db.Questions.AsQueryable();
         if (Guid.TryParse(moduleId, out var mid)) q = q.Where(x => x.ModuleId == mid);

@@ -1,5 +1,6 @@
 @page "/ai-lesson-staging"
 @inject ILessonService Lessons
+@inject EduNexus.Web.Services.UserSession Session
 
 <PageTitle>AI Lesson Staging</PageTitle>
 
@@ -159,7 +160,7 @@
 
         try
         {
-            Guid.TryParse(smeId, out var sme);
+            var sme = Session.CurrentUser?.Id ?? Guid.Empty;
             Guid.TryParse(targetLessonId, out var lesson);
 
             await Lessons.GenerateDraftAsync(

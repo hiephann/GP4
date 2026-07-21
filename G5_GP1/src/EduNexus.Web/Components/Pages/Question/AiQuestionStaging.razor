@@ -1,6 +1,7 @@
 @page "/ai-question-staging"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 @inject EduNexus.Api.Question.Services.IQuestionService QuestionService
+@inject EduNexus.Web.Services.UserSession Session
 
 <PageTitle>AI Question Review</PageTitle>
 
@@ -118,9 +119,8 @@
         message = null;
         try
         {
-            using var db = await DbFactory.CreateDbContextAsync();
-            var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
-            await QuestionService.GenerateDraftAsync(new EduNexus.Api.Question.DTOs.GenerateQuestionRequest(targetModuleId, source, 5), anyUser ?? Guid.Empty);
+            var actorId = Session.CurrentUser?.Id ?? throw new InvalidOperationException("Phiên đăng nhập đã hết hạn.");
+            await QuestionService.GenerateDraftAsync(new EduNexus.Api.Question.DTOs.GenerateQuestionRequest(targetModuleId, source, 5), actorId);
             source = "";
             success = true;
             message = "AI created a draft only. Review it before approving publication.";

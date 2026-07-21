@@ -1,6 +1,7 @@
 @page "/ai-flashcard-staging"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 @inject EduNexus.Api.Flashcard.Services.IFlashcardService FlashcardService
+@inject EduNexus.Web.Services.UserSession Session
 
 <PageTitle>AI Flashcard Review</PageTitle>
 
@@ -90,9 +91,8 @@
         isGenerating = true; message = null;
         try
         {
-            using var db = await DbFactory.CreateDbContextAsync();
-            var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
-            await FlashcardService.GenerateDraftAsync(new EduNexus.Api.Flashcard.DTOs.GenerateFlashcardRequest(targetModuleId, source), anyUser ?? Guid.Empty);
+            var actorId = Session.CurrentUser?.Id ?? throw new InvalidOperationException("Phiên đăng nhập đã hết hạn.");
+            await FlashcardService.GenerateDraftAsync(new EduNexus.Api.Flashcard.DTOs.GenerateFlashcardRequest(targetModuleId, source), actorId);
             source = "";
             success = true; message = "AI created a draft only. Review it before approving publication.";
             await Load();
