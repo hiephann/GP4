@@ -11,6 +11,8 @@ namespace EduNexus.Api.Flashcard.Services
         Task<FlashcardPracticeStatusDto> GetPracticeStatusAsync(Guid moduleId, Guid studentId, CancellationToken ct = default);
         Task MarkAsync(Guid flashcardId, MarkFlashcardRequest request, CancellationToken ct = default);
         Task<AiFlashcardDraftDto> GenerateDraftAsync(GenerateFlashcardRequest request, Guid smeId, CancellationToken ct = default);
+        Task UpdateDraftJsonAsync(Guid draftId, string generatedJson, CancellationToken ct = default);
         Task ApproveDraftAsync(Guid draftId, CancellationToken ct = default);
+        Task RejectDraftAsync(Guid draftId, CancellationToken ct = default);
     }
 }

@@ -1,5 +1,7 @@
 @page "/assignment-submit"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject EduNexus.Api.Assignment.Services.IAssignmentService AssignmentService
+@inject EduNexus.Web.Services.UserSession Session
 
 <PageTitle>Nộp Bài Tập — EduNexus</PageTitle>
 
@@ -55,7 +57,8 @@
                 </div>
                 <div class="col-md-6">
                     <label class="lms-label"><i class="bi bi-person"></i> Học viên (mô phỏng đăng nhập)</label>
-                    <select class="form-select lms-input" @bind="studentId" id="select-student">
+                    <div class="form-control lms-input bg-light">@Session.CurrentUser?.DisplayName (@Session.CurrentUser?.Email)</div>
+                    <select class="form-select lms-input" @bind="studentId" id="select-student" hidden aria-hidden="true">
                         <option value="">— Chọn học viên —</option>
                         @if (students is not null)
                         {
@@ -233,7 +236,7 @@
 
     private async Task Submit()
     {
-        if (!Guid.TryParse(assignmentId, out var aid) || !Guid.TryParse(studentId, out var sid))
+        if (!Guid.TryParse(assignmentId, out var aid) || Session.CurrentUser is null)
         {
             ok = false;
             message = "Vui lòng chọn bài tập và học viên trước khi nộp.";
@@ -249,71 +252,26 @@
         isSubmitting = true;
         StateHasChanged();
 
-        // Simulate AI processing delay
-        await Task.Delay(2000);
-
-        using var db = await DbFactory.CreateDbContextAsync();
-        if (await db.Submissions.AnyAsync(s => s.AssignmentId == aid && s.StudentId == sid))
+        try
+        {
+            var submissionId = await AssignmentService.SubmitAsync(aid,
+                new EduNexus.Api.Assignment.DTOs.SubmitAssignmentRequest(Session.CurrentUser.Id, content));
+            using var db = await DbFactory.CreateDbContextAsync();
+            var submission = await db.Submissions.FindAsync(submissionId);
+            content = "";
+            ok = true;
+            message = submission?.Status == "AiGraded"
+                ? $"Gemini đã chấm sơ bộ: {submission.AiTotalScore:0.#} điểm. Giáo viên sẽ xác nhận điểm cuối."
+                : "Bài đã được nộp. AI chưa trả kết quả, giáo viên sẽ chấm và xác nhận.";
+        }
+        catch (InvalidOperationException ex)
         {
             ok = false;
-            message = "Bạn đã nộp bài tập này rồi — không thể nộp lần 2 (NAC-08-b).";
+            message = ex.Message;
+        }
+        finally
+        {
             isSubmitting = false;
-            return;
         }
-
-        var newSubmission = new Submission
-        {
-            Id = Guid.NewGuid(),
-            AssignmentId = aid,
-            StudentId = sid,
-            ContentText = content,
-            SubmittedAt = DateTime.UtcNow,
-            Status = "AiGraded"
-        };
-        db.Submissions.Add(newSubmission);
-
-        // --- Mock AI Grading Logic ---
-        var criteria = await db.RubricCriteria
-            .Where(c => c.AssignmentId == aid)
-            .ToListAsync();
-        decimal totalAiScore = 0;
-        var rnd = new Random();
-
-        foreach (var c in criteria)
-        {
-            // AI scores between 60–100% of MaxScore per criterion
-            decimal rawScore = (decimal)(rnd.NextDouble() * 0.4 + 0.6) * c.MaxScore;
-            decimal aiScore = Math.Round(rawScore, 1);
-            totalAiScore += aiScore;
-
-            db.SubmissionCriterionScores.Add(new SubmissionCriterionScore
-            {
-                Id = Guid.NewGuid(),
-                SubmissionId = newSubmission.Id,
-                CriterionId = c.Id,
-                AiScore = aiScore,
-                Comment = GenerateAiFeedback(c.Name, aiScore, c.MaxScore)
-            });
-        }
-        newSubmission.AiTotalScore = totalAiScore;
-
-        await db.SaveChangesAsync();
-        content = "";
-        ok = true;
-        message = $"AI đã tự động chấm điểm sơ bộ: {totalAiScore:0.#} điểm. Giáo viên sẽ xác nhận kết quả cuối cùng.";
-        isSubmitting = false;
-    }
-
-    /// <summary>
-    /// Generate more realistic AI mock feedback per criterion
-    /// </summary>
-    private string GenerateAiFeedback(string criterionName, decimal score, decimal maxScore)
-    {
-        var ratio = maxScore > 0 ? score / maxScore : 0;
-        if (ratio >= 0.9m)
-            return $"Xuất sắc — Bài làm thể hiện rất tốt tiêu chí \"{criterionName}\". Lập luận chặt chẽ, có dẫn chứng rõ ràng.";
-        if (ratio >= 0.75m)
-            return $"Tốt — Tiêu chí \"{criterionName}\" được đáp ứng khá đầy đủ. Cần bổ sung thêm phân tích sâu hơn ở một số điểm.";
-        return $"Trung bình — Tiêu chí \"{criterionName}\" chưa được khai thác triệt để. Nên cải thiện phần lập luận và dẫn chứng.";
     }
 }

@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace EduNexus.Api.Infrastructure.Ai;
 
@@ -92,6 +94,23 @@ public class FakeAiContentService : IAiContentService
         await Task.Delay(1000, ct);
         var res = "[{\"frontText\":\"Mặt trước giả lập\",\"backText\":\"Mặt sau giả lập\"}]";
         return new AiResult(res, 80, 1000, "Fake/Flashcard");
+    }
+
+    public Task<AiResult> GradeAssignmentAsync(string gradingPrompt, CancellationToken ct = default)
+    {
+        var sw = Stopwatch.StartNew();
+        var criteria = Regex.Matches(gradingPrompt, @"""criterionId""\s*:\s*""(?<id>[0-9a-fA-F-]{36})""\s*,\s*""maxScore""\s*:\s*(?<max>[0-9.]+)")
+            .Select(match => new { Id = match.Groups["id"].Value, Max = decimal.Parse(match.Groups["max"].Value, System.Globalization.CultureInfo.InvariantCulture) })
+            .ToList();
+        var score = gradingPrompt.Length > 800 ? 0.75m : gradingPrompt.Length > 300 ? 0.60m : 0.40m;
+        var result = new
+        {
+            overallScore = criteria.Sum(criterion => Math.Round(criterion.Max * score, 2)),
+            criteria = criteria.Select(criterion => new { criterionId = criterion.Id, score = Math.Round(criterion.Max * score, 2), comment = "[MOCK] Cần cấu hình Gemini API key để có nhận xét AI thực tế." })
+        };
+        var text = JsonSerializer.Serialize(result);
+        sw.Stop();
+        return Task.FromResult(new AiResult(text, text.Length / CharsPerToken, (int)sw.ElapsedMilliseconds, "Mock/AssignmentGrading"));
     }
 
     private static List<string> SplitIntoPoints(string outline)

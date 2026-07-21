@@ -1,5 +1,6 @@
 @page "/assignment-result"
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
+@inject EduNexus.Web.Services.UserSession Session
 
 <PageTitle>Kết Quả Bài Tập — EduNexus</PageTitle>
 
@@ -33,7 +34,7 @@
         <i class="bi bi-check-circle-fill"></i> 2. Cấu Hình Rubric
     </a>
     <div class="step-divider"></div>
-    <a class="step completed" href="assignment-submit">
+    <a class="step completed @(Session.IsInRole("Student") ? "" : "d-none")" href="assignment-submit">
         <i class="bi bi-check-circle-fill"></i> 3. Nộp Bài
     </a>
     <div class="step-divider"></div>
@@ -146,7 +147,7 @@
             </div>
 
             <!-- Teacher Confirm Zone -->
-            @if (current.Status != "Confirmed")
+            @if (CanConfirm && current.Status != "Confirmed")
             {
                 <div class="lms-card p-4">
                     <div class="teacher-zone">
@@ -262,7 +263,7 @@ else
             <div class="empty-icon"><i class="bi bi-clipboard-data"></i></div>
             <h4>Chưa chọn bài nộp</h4>
             <p>Chọn một bài nộp từ danh sách phía trên để xem kết quả đánh giá chi tiết.</p>
-            <a href="assignment-submit" class="btn lms-btn-secondary mt-2">
+            <a href="assignment-submit" class="btn lms-btn-secondary mt-2 @(Session.IsInRole("Student") ? "" : "d-none")">
                 <i class="bi bi-arrow-left me-1"></i> Quay lại nộp bài
             </a>
         </div>
@@ -280,6 +281,7 @@ else
     private string commentInput = "";
     private string studentName = "";
     private string assignmentTitle = "";
+    private bool CanConfirm => Session.IsInRole("Admin", "Teacher", "CourseManager");
 
     protected override async Task OnInitializedAsync() => await LoadList();
 
@@ -292,6 +294,15 @@ else
                              orderby s.SubmittedAt descending
                              select new SubOption(s.Id, a.Title + " — " + u.DisplayName + " (" + s.SubmittedAt.ToString("dd/MM") + ")"))
                             .ToListAsync();
+
+        if (Session.IsInRole("Student") && Session.CurrentUser is not null)
+        {
+            var ownSubmissionIds = await db.Submissions
+                .Where(s => s.StudentId == Session.CurrentUser.Id)
+                .Select(s => s.Id)
+                .ToListAsync();
+            submissions = submissions.Where(s => ownSubmissionIds.Contains(s.Id)).ToList();
+        }
     }
 
     private async Task OnChanged(ChangeEventArgs e)
@@ -299,6 +310,13 @@ else
         if (!Guid.TryParse(e.Value?.ToString(), out var id)) { current = null; return; }
         using var db = await DbFactory.CreateDbContextAsync();
         current = await db.Submissions.FindAsync(id);
+
+        if (current is not null && Session.IsInRole("Student") && current.StudentId != Session.CurrentUser?.Id)
+        {
+            current = null;
+            criterionScores = null;
+            return;
+        }
 
         if (current != null)
         {
@@ -324,13 +342,14 @@ else
 
     private async Task Confirm()
     {
-        if (current is null) return;
+        if (current is null || !CanConfirm || Session.CurrentUser is null) return;
         using var db = await DbFactory.CreateDbContextAsync();
         var s = await db.Submissions.FindAsync(current.Id);
         if (s is not null)
         {
             s.FinalScore = scoreInput;
             s.TeacherComment = commentInput;
+            s.ConfirmedById = Session.CurrentUser.Id;
             s.Status = "Confirmed";
             s.ConfirmedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();

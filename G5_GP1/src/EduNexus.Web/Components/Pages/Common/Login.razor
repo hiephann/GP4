@@ -35,14 +35,14 @@
             <form @onsubmit="HandleLogin">
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="login-email">Email</label>
-                    <input id="login-email" type="email" class="form-control" @bind="email" autocomplete="email" required placeholder="name@example.com" />
+                    <input id="login-email" type="email" class="form-control" @bind="email" @bind:event="oninput" autocomplete="email" required placeholder="name@example.com" />
                 </div>
                 <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <label class="form-label fw-semibold" for="login-password">Mật khẩu</label>
                         <a href="/forgot-password" class="small">Quên mật khẩu?</a>
                     </div>
-                    <input id="login-password" type="password" class="form-control" @bind="password" autocomplete="current-password" required placeholder="Nhập mật khẩu" />
+                    <input id="login-password" type="password" class="form-control" @bind="password" @bind:event="oninput" autocomplete="current-password" required placeholder="Nhập mật khẩu" />
                 </div>
                 <button type="submit" class="btn lms-btn-primary w-100 py-2" disabled="@isLoading">
                     @if (isLoading)

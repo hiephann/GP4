@@ -219,9 +219,7 @@ public class FlashcardService : IFlashcardService
     public async Task ApproveDraftAsync(Guid draftId, CancellationToken ct = default)
     {
         var draft = await _db.AiFlashcardDrafts.FindAsync(new object[] { draftId }, ct);
-        if (draft == null || draft.Status == "Approved") return;
-
-        draft.Status = "Approved";
+        if (draft == null || draft.Status != "Pending") return;
 
         // Phân tích cú pháp chuỗi JSON được tạo ra từ AI thành danh sách thực thể để chèn vào bảng Thẻ chính thức
         if (!string.IsNullOrEmpty(draft.GeneratedJson) && draft.ModuleId.HasValue)
@@ -259,6 +257,31 @@ public class FlashcardService : IFlashcardService
             }
         }
 
+        draft.Status = "Approved";
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateDraftJsonAsync(Guid draftId, string generatedJson, CancellationToken ct = default)
+    {
+        var draft = await _db.AiFlashcardDrafts.FindAsync(new object[] { draftId }, ct);
+        if (draft is null || draft.Status != "Pending")
+            throw new ArgumentException("Chỉ có thể sửa bản nháp AI đang chờ duyệt.");
+
+        var value = generatedJson?.Trim() ?? string.Empty;
+        using var json = JsonDocument.Parse(value);
+        if (json.RootElement.ValueKind != JsonValueKind.Array || json.RootElement.GetArrayLength() == 0)
+            throw new ArgumentException("Bản nháp phải là mảng JSON có ít nhất một flashcard.");
+
+        draft.GeneratedJson = value;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task RejectDraftAsync(Guid draftId, CancellationToken ct = default)
+    {
+        var draft = await _db.AiFlashcardDrafts.FindAsync(new object[] { draftId }, ct);
+        if (draft is null || draft.Status != "Pending") return;
+
+        draft.Status = "Rejected";
         await _db.SaveChangesAsync(ct);
     }
 

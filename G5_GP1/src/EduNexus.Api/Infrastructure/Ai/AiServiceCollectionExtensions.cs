@@ -13,9 +13,9 @@ public static class AiServiceCollectionExtensions
         var section = configuration.GetSection(AiOptions.SectionName);
         services.Configure<AiOptions>(section);
 
-        var apiKey = section.GetValue<string>("Gemini:ApiKey");
+        var geminiKeys = section.GetSection("Gemini").Get<AiOptions.GeminiOptions>()?.GetConfiguredKeys() ?? [];
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (geminiKeys.Count == 0)
         {
             services.AddScoped<IAiContentService, FakeAiContentService>();
         }

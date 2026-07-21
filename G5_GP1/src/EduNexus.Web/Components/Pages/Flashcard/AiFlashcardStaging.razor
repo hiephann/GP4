@@ -2,70 +2,81 @@
 @inject IDbContextFactory<EduNexusDbContext> DbFactory
 @inject EduNexus.Api.Flashcard.Services.IFlashcardService FlashcardService
 
-<PageTitle>AI Flashcard Staging</PageTitle>
+<PageTitle>AI Flashcard Review</PageTitle>
 
 <div class="page-header">
-    <h2>AI Flashcard Staging <span class="screen-tag">Flashcard · BR-07</span></h2>
-    <p class="text-muted">AI tạo cặp thuật ngữ–định nghĩa vào khu vực chờ duyệt.</p>
+    <h2>AI Flashcard Review <span class="screen-tag">Flashcard · BR-07</span></h2>
+    <p class="text-muted">AI output is always a draft. Review and edit it before any flashcard reaches the student library.</p>
 </div>
 
-<div class="card mb-3">
-    <div class="card-body">
-        <label class="form-label">Văn bản nguồn</label>
-        <textarea class="form-control mb-2" rows="3" @bind="source" placeholder="Dán nội dung để AI tạo flashcard..."></textarea>
-        <select class="form-select mb-2" @bind="moduleId">
-            <option value="">-- Chọn module nhận flashcard sau khi duyệt --</option>
-            @if (modules is not null)
+<div class="lms-card p-4 mb-4">
+    <label class="form-label fw-bold">Prompt / source material</label>
+    <textarea class="form-control lms-focus-textarea mb-3" rows="5" @bind="source" @bind:event="oninput" placeholder="Paste lesson content or a clear prompt for AI to create flashcards..."></textarea>
+    <select class="form-select lms-input mb-3" @bind="moduleId">
+        <option value="">-- Select target module --</option>
+        @if (modules is not null)
+        {
+            @foreach (var module in modules)
             {
-                @foreach (var module in modules)
-                {
-                    <option value="@module.Id">@module.Title</option>
-                }
+                <option value="@module.Id">@module.Title</option>
             }
-        </select>
-        <button class="btn lms-btn-primary" @onclick="Generate" disabled="@(string.IsNullOrWhiteSpace(source) || isGenerating)">
-            @if (isGenerating)
-            {
-                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                <span>Đang sinh thẻ...</span>
-            }
-            else
-            {
-                <span class="bi bi-robot"></span>
-                <span>Sinh thẻ</span>
-            }
-        </button>
-    </div>
+        }
+    </select>
+    <button class="btn lms-btn-primary" @onclick="Generate" disabled="@(string.IsNullOrWhiteSpace(source) || isGenerating)">
+        @if (isGenerating) { <span class="spinner-border spinner-border-sm me-2"></span><span>Generating draft...</span> }
+        else { <i class="bi bi-robot me-2"></i><span>Generate AI draft</span> }
+    </button>
+    @if (message is not null) { <div class="alert @(success ? "alert-success" : "alert-danger") mt-3 mb-0">@message</div> }
 </div>
 
-<h6>Khu vực chờ duyệt</h6>
-@if (drafts is null) { <p>Đang tải...</p> }
-else
-{
-    <table class="table lms-table">
-        <thead><tr><th>Nội dung sinh ra</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>
+<h5 class="fw-bold mb-3">Draft review queue</h5>
+<div class="lms-card overflow-hidden">
+    @if (drafts is null) { <div class="p-4 text-center text-muted">Loading drafts...</div> }
+    else if (drafts.Count == 0) { <div class="p-4 text-center text-muted">No AI drafts yet.</div> }
+    else
+    {
+        <div class="table-responsive"><table class="table align-middle mb-0">
+            <thead class="table-light"><tr><th class="ps-4">AI draft preview (JSON)</th><th>Status</th><th class="text-end pe-4">Actions</th></tr></thead>
+            <tbody>
             @foreach (var d in drafts)
             {
                 <tr>
-                    <td style="max-width:520px">@d.GeneratedJson</td>
-                    <td><span class="badge bg-@(d.Status=="Approved"?"success":"warning")">@d.Status</span></td>
-                    <td>@if (d.Status == "Pending") { <button class="btn btn-sm lms-btn-success" @onclick="() => Approve(d.Id)">Phê duyệt</button> }</td>
+                    <td class="ps-4 py-3" style="min-width:420px">
+                        @if (editingId == d.Id) { <textarea class="form-control font-monospace" rows="13" @bind="editJson" @bind:event="oninput"></textarea> }
+                        else { <div class="bg-dark text-light p-3 rounded-3 font-monospace small" style="max-height:210px; overflow-y:auto; white-space:pre-wrap">@d.GeneratedJson</div> }
+                    </td>
+                    <td><span class="badge @StatusClass(d.Status)">@StatusText(d.Status)</span></td>
+                    <td class="text-end pe-4 text-nowrap">
+                        @if (d.Status == "Pending")
+                        {
+                            @if (editingId == d.Id)
+                            {
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => SaveEdit(d.Id)" disabled="@busy">Save draft</button>
+                                <button class="btn btn-sm btn-outline-secondary me-1" @onclick="CancelEdit" disabled="@busy">Cancel</button>
+                            }
+                            else { <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEdit(d)" disabled="@busy">Review / edit</button> }
+                            <button class="btn btn-sm btn-success me-1" @onclick="() => Approve(d.Id)" disabled="@busy">Approve &amp; publish</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Reject(d.Id)" disabled="@busy">Reject</button>
+                        }
+                    </td>
                 </tr>
             }
-            @if (drafts.Count == 0) { <tr><td colspan="3" class="text-muted">Chưa có bản nháp.</td></tr> }
-        </tbody>
-    </table>
-}
+            </tbody>
+        </table></div>
+    }
+</div>
 
 @code {
     private string source = "";
     private string? moduleId;
     private List<Module>? modules;
     private List<AiFlashcardDraft>? drafts;
+    private Guid? editingId;
+    private string editJson = "";
+    private bool isGenerating, busy, success;
+    private string? message;
 
     protected override async Task OnInitializedAsync() => await Load();
-
     private async Task Load()
     {
         using var db = await DbFactory.CreateDbContextAsync();
@@ -73,33 +84,50 @@ else
         modules = await db.Modules.OrderBy(m => m.OrderIndex).ThenBy(m => m.Title).ToListAsync();
     }
 
-    [Inject] private EduNexus.Api.Infrastructure.Ai.IAiContentService AiService { get; set; } = default!;
-    private bool isGenerating = false;
-
     private async Task Generate()
     {
         if (string.IsNullOrWhiteSpace(source) || !Guid.TryParse(moduleId, out var targetModuleId)) return;
-        isGenerating = true;
-        StateHasChanged();
-
+        isGenerating = true; message = null;
         try
         {
             using var db = await DbFactory.CreateDbContextAsync();
             var anyUser = await db.Users.Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
-            await FlashcardService.GenerateDraftAsync(
-                new EduNexus.Api.Flashcard.DTOs.GenerateFlashcardRequest(targetModuleId, source), anyUser ?? Guid.Empty);
+            await FlashcardService.GenerateDraftAsync(new EduNexus.Api.Flashcard.DTOs.GenerateFlashcardRequest(targetModuleId, source), anyUser ?? Guid.Empty);
             source = "";
-        }
-        finally
-        {
-            isGenerating = false;
+            success = true; message = "AI created a draft only. Review it before approving publication.";
             await Load();
         }
+        catch (Exception ex) { success = false; message = ex.Message; }
+        finally { isGenerating = false; }
     }
 
-    private async Task Approve(Guid id)
+    private void StartEdit(AiFlashcardDraft draft) { editingId = draft.Id; editJson = draft.GeneratedJson ?? ""; }
+    private void CancelEdit() { editingId = null; editJson = ""; }
+    private Task SaveEdit(Guid id) => Run(async () =>
+    {
+        await FlashcardService.UpdateDraftJsonAsync(id, editJson);
+        CancelEdit(); await Load(); success = true; message = "Draft saved. It has not been published.";
+    });
+    private Task Approve(Guid id) => Run(async () =>
     {
         await FlashcardService.ApproveDraftAsync(id);
-        await Load();
+        if (editingId == id) CancelEdit();
+        await Load(); success = true; message = "Draft approved and flashcards were added to the library.";
+    });
+    private Task Reject(Guid id) => Run(async () =>
+    {
+        await FlashcardService.RejectDraftAsync(id);
+        if (editingId == id) CancelEdit();
+        await Load(); success = true; message = "Draft rejected. No flashcards were published.";
+    });
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; message = null;
+        try { await action(); }
+        catch (Exception ex) { success = false; message = ex.Message; }
+        finally { busy = false; }
     }
+    private static string StatusText(string status) => status switch { "Approved" => "Approved", "Rejected" => "Rejected", _ => "Pending review" };
+    private static string StatusClass(string status) => status switch { "Approved" => "bg-success", "Rejected" => "bg-secondary", _ => "bg-warning text-dark" };
 }

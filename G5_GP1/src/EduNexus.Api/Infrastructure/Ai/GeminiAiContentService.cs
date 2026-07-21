@@ -34,6 +34,11 @@ public class GeminiAiContentService : IAiContentService
         "Chỉ trả về MỘT mảng JSON hợp lệ, KHÔNG bọc trong markdown block (```json). " +
         "Cấu trúc mỗi object: { \"frontText\": \"Thuật ngữ (mặt trước)\", \"backText\": \"Định nghĩa (mặt sau)\" }.";
 
+    private const string AssignmentGradingSystemPrompt =
+        "Bạn là trợ lý chấm bài cho EduNexus. Chấm bài theo đúng rubric được cung cấp, công bằng và ngắn gọn. " +
+        "Chỉ trả về MỘT JSON object hợp lệ, không markdown: { \"overallScore\": number, \"criteria\": [ { \"criterionId\": \"guid\", \"score\": number, \"comment\": \"nhận xét tiếng Việt\" } ] }. " +
+        "Score của từng criterion nằm trong [0, maxScore]; overallScore là tổng score. Đây là điểm sơ bộ để giáo viên duyệt, không phải điểm cuối.";
+
     private readonly HttpClient _http;
     private readonly AiOptions.GeminiOptions _options;
     private readonly ILogger<GeminiAiContentService> _logger;
@@ -57,39 +62,70 @@ public class GeminiAiContentService : IAiContentService
     public Task<AiResult> GenerateFlashcardsAsync(string sourceText, CancellationToken ct = default)
         => CallAsync(FlashcardSystemPrompt, $"Văn bản nguồn:\n{sourceText}", ct);
 
-    private async Task<AiResult> CallAsync(string systemPrompt, string userPrompt, CancellationToken ct)
+    public Task<AiResult> GradeAssignmentAsync(string gradingPrompt, CancellationToken ct = default)
+        => CallAsync(AssignmentGradingSystemPrompt, gradingPrompt, ct, "application/json");
+
+    private async Task<AiResult> CallAsync(string systemPrompt, string userPrompt, CancellationToken ct, string? responseMimeType = null)
     {
-        var url = $"v1beta/models/{_options.Model}:generateContent?key={_options.ApiKey}";
+        var generationConfig = new Dictionary<string, object> { ["temperature"] = 0.7 };
+        if (responseMimeType is not null) generationConfig["responseMimeType"] = responseMimeType;
         var body = new
         {
             system_instruction = new { parts = new[] { new { text = systemPrompt } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userPrompt } } } },
-            generationConfig = new { temperature = 0.7 }
+            generationConfig
         };
 
+        var keys = _options.GetConfiguredKeys();
+        if (keys.Count == 0) throw new InvalidOperationException("Gemini API key is not configured.");
         var sw = Stopwatch.StartNew();
-        using var response = await _http.PostAsJsonAsync(url, body, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
+        HttpResponseMessage? response = null;
+        string json = string.Empty;
+        for (var index = 0; index < keys.Count; index++)
+        {
+            response?.Dispose();
+            // Keep the key out of the URL: HttpClient diagnostics commonly log URLs.
+            // Google accepts x-goog-api-key for the Generative Language API.
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"v1beta/models/{_options.Model}:generateContent")
+            {
+                Content = JsonContent.Create(body)
+            };
+            request.Headers.TryAddWithoutValidation("x-goog-api-key", keys[index]);
+            response = await _http.SendAsync(request, ct);
+            json = await response.Content.ReadAsStringAsync(ct);
+            if (response.IsSuccessStatusCode) break;
+            var status = (int)response.StatusCode;
+            var shouldTryNextKey = status is 400 or 401 or 403 or 429 or 500 or 503;
+            if (!shouldTryNextKey || index == keys.Count - 1) break;
+
+            _logger.LogWarning(
+                "Gemini key {KeyIndex} was rejected or temporarily unavailable (HTTP {Status}); trying the next configured key.",
+                index + 1,
+                status);
+        }
         sw.Stop();
 
-        if (!response.IsSuccessStatusCode)
+        using (response)
         {
-            _logger.LogError("Gemini trả về {Status}: {Body}", (int)response.StatusCode, json);
-            throw new InvalidOperationException(
-                $"Gọi Gemini thất bại ({(int)response.StatusCode}). Kiểm tra lại Ai:Gemini:ApiKey và Ai:Gemini:Model.");
+            if (response is null || !response.IsSuccessStatusCode)
+            {
+                var status = response is null ? 0 : (int)response.StatusCode;
+                _logger.LogError("Gemini returned {Status}: {Body}", status, json);
+                throw new InvalidOperationException($"Gemini request failed ({status}). Check the model and API key configuration.");
+            }
+
+            using var doc = JsonDocument.Parse(json);
+            var text = ExtractText(doc.RootElement);
+            if (string.IsNullOrWhiteSpace(text))
+                throw new InvalidOperationException("Gemini did not return usable content.");
+
+            var tokens = doc.RootElement.TryGetProperty("usageMetadata", out var usage)
+                         && usage.TryGetProperty("totalTokenCount", out var total)
+                ? total.GetInt64()
+                : 0;
+
+            return new AiResult(text.Trim(), tokens, (int)sw.ElapsedMilliseconds, $"Gemini/{_options.Model}");
         }
-
-        using var doc = JsonDocument.Parse(json);
-        var text = ExtractText(doc.RootElement);
-        if (string.IsNullOrWhiteSpace(text))
-            throw new InvalidOperationException("Gemini không trả về nội dung (có thể bị chặn bởi bộ lọc an toàn).");
-
-        var tokens = doc.RootElement.TryGetProperty("usageMetadata", out var usage)
-                     && usage.TryGetProperty("totalTokenCount", out var total)
-            ? total.GetInt64()
-            : 0;
-
-        return new AiResult(text.Trim(), tokens, (int)sw.ElapsedMilliseconds, $"Gemini/{_options.Model}");
     }
 
     /// <summary>Ghép các part text của candidate đầu tiên.</summary>

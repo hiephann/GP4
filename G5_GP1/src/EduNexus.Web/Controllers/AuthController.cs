@@ -108,8 +108,9 @@ public class AuthController : Controller
     {
         using var db = await _dbFactory.CreateDbContextAsync();
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        var isNewUser = user is null;
 
-        if (user is null)
+        if (isNewUser)
         {
             var studentRole = await db.Roles.SingleOrDefaultAsync(r => r.Name == "Student");
             if (studentRole is null) return Redirect("/login?error=google_auth_failed");
@@ -126,22 +127,35 @@ public class AuthController : Controller
                 CreatedAt = DateTime.UtcNow
             };
             db.Users.Add(user);
+            // Save the principal row before creating any dependent records.
+            // The existing database schema has FK constraints but no EF navigation
+            // properties on UserRole/LoginSession to establish insert ordering.
+            await db.SaveChangesAsync();
             db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = studentRole.Id });
         }
         else
         {
-            if (!user.IsActive) return Redirect("/login?error=google_auth_failed");
-            user.GoogleSubject ??= googleSubject;
-            user.AuthProvider = "Google";
-            user.IsEmailVerified = true;
-            user.UpdatedAt = DateTime.UtcNow;
+            var existingUser = user!;
+            if (!existingUser.IsActive) return Redirect("/login?error=google_auth_failed");
+            existingUser.GoogleSubject ??= googleSubject;
+            existingUser.AuthProvider = "Google";
+            existingUser.IsEmailVerified = true;
+            existingUser.UpdatedAt = DateTime.UtcNow;
+        }
+
+        var resolvedUser = user ?? throw new InvalidOperationException("Google user could not be resolved.");
+        if (!isNewUser && !await db.UserRoles.AnyAsync(role => role.UserId == resolvedUser.Id))
+        {
+            var studentRole = await db.Roles.SingleOrDefaultAsync(role => role.Name == "Student")
+                ?? throw new InvalidOperationException("Student role is not configured.");
+            db.UserRoles.Add(new UserRole { UserId = resolvedUser.Id, RoleId = studentRole.Id });
         }
 
         var token = Guid.NewGuid();
         db.LoginSessions.Add(new LoginSession
         {
             Id = token,
-            UserId = user.Id,
+            UserId = resolvedUser.Id,
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddMinutes(5)
         });

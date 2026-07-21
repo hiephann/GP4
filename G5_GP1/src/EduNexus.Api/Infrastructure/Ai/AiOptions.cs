@@ -11,7 +11,15 @@ public class AiOptions
     public class GeminiOptions
     {
         public string ApiKey { get; set; } = string.Empty;
+        public List<string> ApiKeys { get; set; } = new();
         public string Model { get; set; } = "gemini-2.0-flash";
+
+        public IReadOnlyList<string> GetConfiguredKeys()
+        {
+            var keys = ApiKeys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList();
+            if (!string.IsNullOrWhiteSpace(ApiKey)) keys.Insert(0, ApiKey);
+            return keys.Distinct(StringComparer.Ordinal).ToList();
+        }
     }
 
     /// <summary>YouTube Data API v3 — dùng khi video không lấy được phụ đề.</summary>

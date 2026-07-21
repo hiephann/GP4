@@ -105,6 +105,20 @@ public class EduNexusDbContext : DbContext
         b.Entity<QuizItem>().HasMany(q => q.Questions).WithOne().HasForeignKey(qq => qq.QuizId);
         b.Entity<QuizAttempt>().HasMany(q => q.Answers).WithOne().HasForeignKey(a => a.AttemptId);
 
+        // SQL Server needs explicit precision for scores and monetary amounts.
+        // This keeps rubric totals and AI scores deterministic during grading.
+        b.Entity<RubricCriterion>().Property(x => x.Weight).HasPrecision(5, 2);
+        b.Entity<RubricCriterion>().Property(x => x.MaxScore).HasPrecision(8, 2);
+        b.Entity<Submission>().Property(x => x.AiTotalScore).HasPrecision(8, 2);
+        b.Entity<Submission>().Property(x => x.FinalScore).HasPrecision(8, 2);
+        b.Entity<SubmissionCriterionScore>().Property(x => x.AiScore).HasPrecision(8, 2);
+        b.Entity<SubmissionCriterionScore>().Property(x => x.FinalScore).HasPrecision(8, 2);
+        b.Entity<Class>().Property(x => x.Fee).HasPrecision(18, 2);
+        b.Entity<CoursePrice>().Property(x => x.Price).HasPrecision(18, 2);
+        b.Entity<Package>().Property(x => x.Price).HasPrecision(18, 2);
+        b.Entity<Payment>().Property(x => x.Amount).HasPrecision(18, 2);
+        b.Entity<QuizAttempt>().Property(x => x.Score).HasPrecision(5, 2);
+
         base.OnModelCreating(b);
     }
 }

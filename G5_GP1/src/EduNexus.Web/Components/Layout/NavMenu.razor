@@ -30,7 +30,7 @@
             }
         </div>
 
-        @if (Session.CurrentRole?.Name == "Student" || Session.CurrentRole?.Name == "Admin")
+        @if (Session.CurrentRole?.Name == "Student")
         {
             <!-- Student Workspace -->
             <div class="nav-group-title mt-3">Khu vực Học tập</div>
@@ -46,7 +46,7 @@
             <NavItem Href="quiz-taking" Icon="bi-ui-checks" Text="Làm bài thi" />
             <NavItem Href="quiz-history" Icon="bi-clock-history" Text="Lịch sử làm bài" />
         }
-        @if (Session.CurrentRole?.Name == "SME" || Session.CurrentRole?.Name == "Teacher" || Session.CurrentRole?.Name == "Admin")
+        @if (Session.CurrentRole?.Name == "SME" || Session.CurrentRole?.Name == "Teacher" || Session.CurrentRole?.Name == "CourseManager" || Session.CurrentRole?.Name == "Admin")
         {
             <!-- SME / Teacher Workspace -->
             <div class="nav-group-title mt-3">Quản lý Khóa học</div>

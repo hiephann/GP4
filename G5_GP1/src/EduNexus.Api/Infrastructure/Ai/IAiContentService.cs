@@ -22,4 +22,7 @@ public interface IAiContentService
 
     /// <summary>AI Flashcard Staging — sinh flashcards (FT-04).</summary>
     Task<AiResult> GenerateFlashcardsAsync(string sourceText, CancellationToken ct = default);
+
+    /// <summary>Assignment AI grading — returns a JSON rubric assessment for teacher review (FT-08).</summary>
+    Task<AiResult> GradeAssignmentAsync(string gradingPrompt, CancellationToken ct = default);
 }

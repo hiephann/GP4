@@ -1,3 +1,5 @@
+using EduNexus.Api.Assignment.Repositories;
+using EduNexus.Api.Assignment.Services;
 using EduNexus.Api.Flashcard.Repositories;
 using EduNexus.Api.Flashcard.Services;
 using EduNexus.Api.Infrastructure;
@@ -19,6 +21,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
+// The Google token is sent as a query value to Google's validation endpoint.
+// Keep HttpClient request diagnostics below Information so credentials are never
+// written to a local console or CI log.
+builder.Logging.AddFilter("System.Net.Http.HttpClient.GoogleTokenValidation", LogLevel.Warning);
 // Keep development keys with the project instead of the current Windows
 // profile. This prevents stale DPAPI-encrypted keys from breaking Blazor
 // circuits when the app is launched by another local process/user.
@@ -29,6 +35,8 @@ builder.Services.AddScoped<IFlashcardRepository, FlashcardRepository>();
 builder.Services.AddScoped<IFlashcardService, FlashcardService>();
 builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
 builder.Services.AddScoped<IQuestionService, QuestionService>();
+builder.Services.AddScoped<IAssignmentRepository, AssignmentRepository>();
+builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

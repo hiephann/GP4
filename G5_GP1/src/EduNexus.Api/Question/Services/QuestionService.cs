@@ -18,7 +18,9 @@ public interface IQuestionService
     Task DeleteAsync(Guid questionId, CancellationToken ct = default);
     Task<ImportResultDto> ImportExcelAsync(Guid moduleId, IFormFile file, CancellationToken ct = default);
     Task<AiQuestionDraftDto> GenerateDraftAsync(GenerateQuestionRequest request, Guid smeId, CancellationToken ct = default);
+    Task UpdateDraftJsonAsync(Guid draftId, string generatedJson, CancellationToken ct = default);
     Task ApproveDraftAsync(Guid draftId, CancellationToken ct = default);
+    Task RejectDraftAsync(Guid draftId, CancellationToken ct = default);
 }
 
 public class QuestionService : IQuestionService
@@ -202,6 +204,27 @@ public class QuestionService : IQuestionService
             });
         }
         draft.Status = "Approved";
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateDraftJsonAsync(Guid draftId, string generatedJson, CancellationToken ct = default)
+    {
+        var draft = await _db.AiQuestionDrafts.FindAsync(new object[] { draftId }, ct);
+        if (draft is null || draft.Status != "Pending")
+            throw new ArgumentException("Chỉ có thể sửa bản nháp AI đang chờ duyệt.");
+
+        var value = generatedJson?.Trim() ?? string.Empty;
+        ValidateAiQuestionJson(value);
+        draft.GeneratedJson = value;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task RejectDraftAsync(Guid draftId, CancellationToken ct = default)
+    {
+        var draft = await _db.AiQuestionDrafts.FindAsync(new object[] { draftId }, ct);
+        if (draft is null || draft.Status != "Pending") return;
+
+        draft.Status = "Rejected";
         await _db.SaveChangesAsync(ct);
     }
     private static void ValidateAiQuestionJson(string value)

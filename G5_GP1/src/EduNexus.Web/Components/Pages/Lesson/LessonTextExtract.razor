@@ -15,7 +15,7 @@
 <div class="lms-card p-4 mb-4">
     <label class="form-label small text-uppercase text-muted fw-bold">Đường dẫn YouTube</label>
     <div class="input-group mb-3">
-        <input class="form-control lms-input" @bind="url" placeholder="https://www.youtube.com/watch?v=..." />
+        <input class="form-control lms-input" @bind="url" @bind:event="oninput" placeholder="https://www.youtube.com/watch?v=..." />
         <button class="btn lms-btn-primary" @onclick="Extract" disabled="@loading">
             @if (loading)
             {
@@ -39,7 +39,7 @@
 
         </div>
 
-        <textarea class="form-control lms-focus-textarea mb-2" rows="8" @bind="manualTranscript"
+        <textarea class="form-control lms-focus-textarea mb-2" rows="8" @bind="manualTranscript" @bind:event="oninput"
                   placeholder="Dán transcript của video vào đây..."></textarea>
 
         <button class="btn lms-btn-primary" @onclick="SummarizeManual" disabled="@loading">

@@ -35,7 +35,7 @@
     </div>
 
     <label class="form-label small text-uppercase text-muted fw-bold mt-3">Đề cương / văn bản nguồn</label>
-    <textarea class="form-control lms-focus-textarea" rows="4" @bind="outline"
+    <textarea class="form-control lms-focus-textarea" rows="4" @bind="outline" @bind:event="oninput"
               placeholder="Ví dụ: Biến và kiểu dữ liệu trong C#; toán tử; câu lệnh điều kiện; vòng lặp"></textarea>
 
     <button class="btn lms-btn-primary mt-3" @onclick="Generate" disabled="@generating">
@@ -105,7 +105,7 @@
 
         @if (editingId == d.Id)
         {
-            <textarea class="form-control lms-focus-textarea" rows="14" @bind="editText"></textarea>
+            <textarea class="form-control lms-focus-textarea" rows="14" @bind="editText" @bind:event="oninput"></textarea>
         }
         else
         {

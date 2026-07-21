@@ -11,6 +11,7 @@ public class UserSession
 {
     private readonly ProtectedSessionStorage _sessionStorage;
     private readonly IDbContextFactory<EduNexusDbContext> _dbFactory;
+    private readonly ILogger<UserSession> _logger;
     private bool _isInitialized;
 
     public User? CurrentUser { get; private set; }
@@ -23,10 +24,14 @@ public class UserSession
 
     public event Action? OnChange;
 
-    public UserSession(ProtectedSessionStorage sessionStorage, IDbContextFactory<EduNexusDbContext> dbFactory)
+    public UserSession(
+        ProtectedSessionStorage sessionStorage,
+        IDbContextFactory<EduNexusDbContext> dbFactory,
+        ILogger<UserSession> logger)
     {
         _sessionStorage = sessionStorage;
         _dbFactory = dbFactory;
+        _logger = logger;
     }
 
     public async Task InitializeAsync()
@@ -56,10 +61,15 @@ public class UserSession
     {
         try
         {
+            email = email.Trim();
             using var db = await _dbFactory.CreateDbContextAsync();
             var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
             
-            if (user == null) return false;
+            if (user == null)
+            {
+                _logger.LogWarning("Local login account was not found or inactive: {Email}.", email);
+                return false;
+            }
 
             // Demo: chấp nhận password cố định hoặc check mock hash
             // Trong dự án thật: dùng BCrypt.Net.BCrypt.Verify(password, user.PasswordHash)
@@ -77,7 +87,11 @@ public class UserSession
             // Cho phép đăng nhập nếu password đúng HOẶC nếu password = hash mock (backward compat)
             if (validPasswords.TryGetValue(email, out var expectedPw))
             {
-                if (password != expectedPw) return false;
+                if (password != expectedPw)
+                {
+                    _logger.LogWarning("Local login password did not match the configured demo account: {Email}.", email);
+                    return false;
+                }
             }
             else
             {
@@ -88,8 +102,9 @@ public class UserSession
             await LoginAsync(user.Id);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Could not authenticate the local demo account {Email}.", email);
             return false;
         }
     }
